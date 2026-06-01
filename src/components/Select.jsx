@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ChevronDown } from 'lucide-react';
 
-export default function Select({ value, onChange, options }) {
+export default function Select({ value, onChange, options, placeholder = 'Seleziona...' }) {
   const [isOpen, setIsOpen] = useState(false);
   const containerRef = useRef(null);
 
@@ -38,7 +38,9 @@ export default function Select({ value, onChange, options }) {
           color: 'var(--color-text-main)'
         }}
       >
-        <span>{value}</span>
+        <span style={{ color: value ? 'var(--color-text-main)' : 'var(--color-text-muted)' }}>
+          {value || placeholder}
+        </span>
         <motion.div animate={{ rotate: isOpen ? 180 : 0 }} transition={{ duration: 0.2 }}>
           <ChevronDown size={20} color="var(--color-text-muted)" />
         </motion.div>

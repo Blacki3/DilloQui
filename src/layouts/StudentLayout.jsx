@@ -1,118 +1,129 @@
-import { Link, Outlet, useLocation, useParams } from 'react-router-dom';
-import { Home, PlusCircle, History, LogOut, Menu, X } from 'lucide-react';
+import { Link, useLocation, useParams, useNavigate, useOutlet } from 'react-router-dom';
+import { Home, PlusCircle, History, LogOut, Settings, User } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '../context/AuthContext';
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 
 export default function StudentLayout() {
   const { slug } = useParams();
   const location = useLocation();
+  const navigate = useNavigate();
   const { logoutStudent } = useAuth();
-  const [isMenuOpen, setIsMenuOpen] = useState(false);
-  
-  const displaySlugName = slug ? slug.toUpperCase() : 'SCUOLA';
+  const [showProfile, setShowProfile] = useState(false);
+  const profileRef = useRef(null);
+  const currentOutlet = useOutlet();
 
-  const menu = [
-    { name: 'Bacheca', path: `/box/${slug}/forum`, icon: <Home size={20} /> },
-    { name: 'Nuova', path: `/box/${slug}/new`, icon: <PlusCircle size={20} /> },
-    { name: 'Le Mie Segnalazioni', path: `/box/${slug}/history`, icon: <History size={20} /> },
+  const isActive = (path) => location.pathname.includes(path);
+
+  // Chiudi popup se clicchi fuori
+  useEffect(() => {
+    const handler = (e) => { if (profileRef.current && !profileRef.current.contains(e.target)) setShowProfile(false); };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
+
+  const tabs = [
+    { name: 'Home',    path: `/box/${slug}/forum`,   icon: Home,       id: 'forum' },
+    { name: 'Nuova',   path: `/box/${slug}/new`,     icon: PlusCircle, id: 'new', isNew: true },
+    { name: 'Storico', path: `/box/${slug}/history`, icon: History,    id: 'history' },
+    { name: 'Profilo', path: `/box/${slug}/profile`, icon: User,       id: 'profile' },
   ];
 
-  // Componente per link per evitare ripetizioni e gestire onClick per mobile
-  const renderLinks = () => (
-    <>
-      {menu.map((item) => {
-        const isActive = location.pathname.includes(item.path);
-        return (
-          <Link 
-            key={item.path}
-            to={item.path}
-            onClick={() => setIsMenuOpen(false)}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px',
-              padding: '12px 16px',
-              borderRadius: '8px',
-              textDecoration: 'none',
-              color: isActive ? 'var(--color-primary)' : 'var(--color-text-muted)',
-              background: isActive ? 'var(--color-primary-lighter)' : 'transparent',
-              fontWeight: isActive ? '600' : '500',
-              transition: '0.2s'
-            }}
-          >
-            {item.icon}
-            <span>{item.name}</span>
-          </Link>
-        )
-      })}
-      
-      <div style={{ width: '100%', height: '1px', background: '#e5e7eb', margin: '4px 0' }} className="mobile-only-divider"></div>
-      
-      <button 
-        onClick={() => {
-          setIsMenuOpen(false);
-          logoutStudent();
-        }}
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: '8px',
-          padding: '12px 16px',
-          borderRadius: '8px',
-          color: 'var(--color-danger)',
-          background: 'transparent',
-          border: 'none',
-          fontWeight: '500',
-          cursor: 'pointer',
-          textAlign: 'left'
-        }}
-      >
-        <LogOut size={20} />
-        <span>Esci</span>
-      </button>
-    </>
-  );
-
   return (
-    <div style={{ minHeight: '100vh', background: '#f9fafb', display: 'flex', flexDirection: 'column' }}>
-      
-      {/* Navbar Principale */}
+    <div className="student-wrapper">
+      {/* Top Navbar */}
       <nav className="student-nav">
         <div className="student-nav-inner">
-          <div className="student-nav-brand">
-            <h2 style={{ margin: 0, fontSize: '1.25rem', color: 'var(--color-text-main)', lineHeight: 1 }}>Dillo Qui</h2>
-            <span style={{ fontSize: '0.875rem', color: 'var(--color-primary)', fontWeight: '600', lineHeight: 1 }}>{displaySlugName}</span>
-          </div>
+          {/* Brand */}
+          <Link to={`/box/${slug}/forum`} className="student-nav-brand" style={{ textDecoration: 'none' }}>
+            <div className="student-nav-brand-text">
+              <span className="brand-dillo">Dillo</span>
+              <span className="brand-qui"> Qui</span>
+            </div>
+          </Link>
 
-          {/* Icona Hamburger visibile solo su Mobile */}
-          <button className="mobile-nav-toggle" onClick={() => setIsMenuOpen(!isMenuOpen)}>
-            {isMenuOpen ? <X size={28} /> : <Menu size={28} />}
-          </button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+            {/* Desktop links */}
+            <div className="student-nav-links desktop-nav" style={{ gap: 4 }}>
+              {tabs.filter(t => t.id !== 'profile').map(tab => (
+                <Link
+                  key={tab.id}
+                  to={tab.path}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: 6,
+                    padding: '8px 14px', borderRadius: 10, textDecoration: 'none',
+                    fontSize: '0.875rem', fontWeight: 600,
+                    color: isActive(tab.id) ? 'var(--color-primary)' : 'var(--color-text-muted)',
+                    background: isActive(tab.id) ? 'var(--color-primary-lighter)' : 'transparent',
+                    transition: '0.15s',
+                  }}
+                >
+                  <tab.icon size={15} /> {tab.name}
+                </Link>
+              ))}
+            </div>
 
-          {/* Links Desktop (nascosti su mobile) */}
-          <div className="student-nav-links desktop-nav">
-            {renderLinks()}
+            {/* Profile avatar + popup (all screens) */}
+            <div style={{ position: 'relative' }} ref={profileRef}>
+              <button
+                className="profile-avatar-btn"
+                onClick={() => setShowProfile(!showProfile)}
+              >
+                <User size={18} />
+              </button>
+
+              {showProfile && (
+                <div className="profile-popup">
+                  <button className="profile-popup-item" onClick={() => { setShowProfile(false); navigate(`/box/${slug}/profile`); }}>
+                    <Settings size={16} /> Impostazioni
+                  </button>
+                  <div className="profile-popup-divider" />
+                  <button className="profile-popup-item danger" onClick={() => { setShowProfile(false); logoutStudent(); }}>
+                    <LogOut size={16} /> Esci
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
         </div>
-
-        {/* Menu a discesa per Mobile */}
-        {isMenuOpen && (
-          <div className="mobile-nav-menu">
-            {renderLinks()}
-          </div>
-        )}
       </nav>
 
-      {/* Main Content */}
-      <main className="student-main-content" style={{ flex: 1, padding: '32px 24px', maxWidth: '1000px', margin: '0 auto', width: '100%' }}>
-        <Outlet />
+      {/* Main content */}
+      <main className="student-main-content">
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={location.pathname}
+            initial={{ opacity: 0, y: 10, filter: 'blur(2px)' }}
+            animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
+            exit={{ opacity: 0, y: -10, filter: 'blur(2px)' }}
+            transition={{ duration: 0.2 }}
+            style={{ width: '100%', height: '100%' }}
+          >
+            {currentOutlet}
+          </motion.div>
+        </AnimatePresence>
       </main>
-      
-      <style>{`
-        @media (min-width: 769px) {
-          .mobile-only-divider { display: none; }
-        }
-      `}</style>
+
+      {/* Bottom Tab Bar (mobile) */}
+      <div className="student-tab-bar">
+        <div className="student-tab-bar-inner">
+          {tabs.filter(t => t.id !== 'profile').map(tab => {
+            const active = isActive(tab.id);
+            return (
+              <button
+                key={tab.id}
+                className={`tab-item ${active ? 'active' : ''} ${tab.isNew ? 'tab-new' : ''}`}
+                onClick={() => navigate(tab.path)}
+              >
+                <div className="tab-icon-wrap">
+                  <tab.icon size={tab.isNew ? 22 : 20} />
+                </div>
+                <span>{tab.name}</span>
+              </button>
+            );
+          })}
+        </div>
+      </div>
     </div>
   );
 }
