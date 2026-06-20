@@ -1,22 +1,56 @@
-import { Routes, Route, Navigate, useParams } from 'react-router-dom';
-import Verify from './pages/Verify';
+import { useEffect, Suspense, lazy } from 'react';
+import { Routes, Route, Navigate, useParams, useLocation } from 'react-router-dom';
+import PublicLayout from './layouts/PublicLayout';
 import Landing from './pages/Landing';
 import About from './pages/About';
-import AdminLayout from './layouts/AdminLayout';
-import AdminLogin from './pages/admin/AdminLogin';
-import Dashboard from './pages/admin/Dashboard';
-import ReportsList from './pages/admin/ReportsList';
-import Settings from './pages/admin/Settings';
-import AdminProfile from './pages/admin/AdminProfile';
-import StudentLayout from './layouts/StudentLayout';
-import Forum from './pages/student/Forum';
-import PostDetail from './pages/student/PostDetail';
-import NewReport from './pages/student/NewReport';
-import MyReports from './pages/student/MyReports';
-import StudentProfile from './pages/student/StudentProfile';
 import { useAuth } from './context/AuthContext';
-import DemoSwitcher from './components/demo/DemoSwitcher';
 
+// Lazy loading delle schermate di accesso (caricamento indipendente e rapido)
+const Verify = lazy(() => import('./pages/Verify'));
+const AdminLogin = lazy(() => import('./pages/admin/AdminLogin'));
+
+// Funzione helper per estrarre i componenti dal bundle unico
+const lazyFromBundle = (componentName) => {
+  return lazy(() => import('./bundles/AppBundle').then(m => ({ default: m[componentName] })));
+};
+
+// Caricamento dell'intera app in un unico Chunk (Sportello Studenti + Admin)
+const AdminLayout = lazyFromBundle('AdminLayout');
+const Dashboard = lazyFromBundle('Dashboard');
+const ReportsList = lazyFromBundle('ReportsList');
+const Settings = lazyFromBundle('Settings');
+const AdminProfile = lazyFromBundle('AdminProfile');
+const StudentLayout = lazyFromBundle('StudentLayout');
+const Forum = lazyFromBundle('Forum');
+const PostDetail = lazyFromBundle('PostDetail');
+const NewReport = lazyFromBundle('NewReport');
+const MyReports = lazyFromBundle('MyReports');
+const StudentProfile = lazyFromBundle('StudentProfile');
+const DemoSwitcher = lazyFromBundle('DemoSwitcher');
+
+// Fallback Loader in stile Brutalista
+const BrutalistLoader = () => (
+  <div style={{
+    height: '100vh', width: '100vw',
+    background: 'var(--b-black)', color: 'var(--b-yellow)',
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
+    fontFamily: "'Space Grotesk', sans-serif", fontSize: '2rem', fontWeight: 900,
+    textTransform: 'uppercase', letterSpacing: '0.1em'
+  }}>
+    Caricamento...
+  </div>
+);
+
+
+// Riporta in cima alla pagina ad ogni cambio rotta (escluse ancore e scrollTo gestiti dalla Landing)
+function ScrollToTop() {
+  const { pathname, hash, state } = useLocation();
+  useEffect(() => {
+    if (hash || state?.scrollTo) return;
+    window.scrollTo(0, 0);
+  }, [pathname, hash, state]);
+  return null;
+}
 
 // Protezione rotta Admin
 function AdminProtectedRoute({ children }) {
@@ -51,59 +85,64 @@ function StudentProtectedRoute({ children }) {
 function App() {
   return (
     <>
-      <Routes>
-        {/* Home → Landing page */}
-        <Route path="/" element={<Landing />} />
-        <Route path="/about" element={<About />} />
+      <ScrollToTop />
+      <Suspense fallback={<BrutalistLoader />}>
+        <Routes>
+          {/* Pagine pubbliche con transizione di cambio pagina */}
+          <Route element={<PublicLayout />}>
+            <Route path="/" element={<Landing />} />
+            <Route path="/chi-siamo" element={<About />} />
+          </Route>
 
-        {/* Route Studenti */}
-        {/* Schermata di verifica OTP all'ingresso */}
-        <Route path="/box/:slug" element={<BoxVerifyFlow />} />
-        
-        {/* Layout Studente proteso */}
-        <Route path="/box/:slug" element={
-          <StudentProtectedRoute>
-            <StudentLayout />
-          </StudentProtectedRoute>
-        }>
-          <Route path="forum" element={<Forum />} />
-          <Route path="post/:postId" element={<PostDetail />} />
-          <Route path="new" element={<NewReport />} />
-          <Route path="history" element={<MyReports />} />
-          <Route path="profile" element={<StudentProfile />} />
-        </Route>
+          {/* Route Studenti */}
+          {/* Schermata di verifica OTP all'ingresso */}
+          <Route path="/box/:slug" element={<BoxVerifyFlow />} />
+          
+          {/* Layout Studente proteso */}
+          <Route path="/box/:slug" element={
+            <StudentProtectedRoute>
+              <StudentLayout />
+            </StudentProtectedRoute>
+          }>
+            <Route path="forum" element={<Forum />} />
+            <Route path="post/:postId" element={<PostDetail />} />
+            <Route path="new" element={<NewReport />} />
+            <Route path="history" element={<MyReports />} />
+            <Route path="profile" element={<StudentProfile />} />
+          </Route>
 
-        {/* Route Admin */}
-        <Route path="/admin/login" element={<AdminLogin />} />
-        <Route path="/admin" element={
-          <AdminProtectedRoute>
-            <AdminLayout />
-          </AdminProtectedRoute>
-        }>
-          <Route index element={<Navigate to="dashboard" replace />} />
-          <Route path="dashboard" element={<Dashboard />} />
-          <Route path="reports" element={<ReportsList />} />
-          <Route path="settings" element={<Settings />} />
-          <Route path="profile" element={<AdminProfile />} />
-        </Route>
+          {/* Route Admin */}
+          <Route path="/admin/login" element={<AdminLogin />} />
+          <Route path="/admin" element={
+            <AdminProtectedRoute>
+              <AdminLayout />
+            </AdminProtectedRoute>
+          }>
+            <Route index element={<Navigate to="dashboard" replace />} />
+            <Route path="dashboard" element={<Dashboard />} />
+            <Route path="reports" element={<ReportsList />} />
+            <Route path="settings" element={<Settings />} />
+            <Route path="profile" element={<AdminProfile />} />
+          </Route>
 
-        {/* Route Admin (DEMO) */}
-        <Route path="/demo/admin" element={
-          <AdminProtectedRoute>
-            <AdminLayout />
-          </AdminProtectedRoute>
-        }>
-          <Route index element={<Navigate to="dashboard" replace />} />
-          <Route path="dashboard" element={<Dashboard />} />
-          <Route path="reports" element={<ReportsList />} />
-          <Route path="settings" element={<Settings />} />
-          <Route path="profile" element={<AdminProfile />} />
-        </Route>
+          {/* Route Admin (DEMO) */}
+          <Route path="/demo/admin" element={
+            <AdminProtectedRoute>
+              <AdminLayout />
+            </AdminProtectedRoute>
+          }>
+            <Route index element={<Navigate to="dashboard" replace />} />
+            <Route path="dashboard" element={<Dashboard />} />
+            <Route path="reports" element={<ReportsList />} />
+            <Route path="settings" element={<Settings />} />
+            <Route path="profile" element={<AdminProfile />} />
+          </Route>
 
-        {/* Fallback per rotte inesistenti */}
-        <Route path="*" element={<Navigate to="/admin/login" replace />} />
-      </Routes>
-      <DemoSwitcher />
+          {/* Fallback per rotte inesistenti */}
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+        <DemoSwitcher />
+      </Suspense>
     </>
   );
 }

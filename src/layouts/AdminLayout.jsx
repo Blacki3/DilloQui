@@ -1,17 +1,37 @@
-import { useLocation, useNavigate, useOutlet } from 'react-router-dom';
-import { LayoutDashboard, Settings as SettingsIcon, MessageSquareWarning, LogOut, Menu, X, User, Settings } from 'lucide-react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { Link, useLocation, useNavigate, useOutlet } from 'react-router-dom';
+import { LayoutDashboard, Settings as SettingsIcon, MessageSquareWarning, LogOut, Menu, X, User, Settings, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useState, useRef, useEffect } from 'react';
+import BrandWordmark from '../components/BrandWordmark';
+import { useUnreadReportCount } from '../services/mockStore';
+
+const SIDEBAR_COLLAPSED_KEY = 'dq_admin_sidebar_collapsed';
+
+function readSidebarCollapsed() {
+  try {
+    return localStorage.getItem(SIDEBAR_COLLAPSED_KEY) === 'true';
+  } catch {
+    return false;
+  }
+}
 
 export default function AdminLayout() {
   const location = useLocation();
   const navigate = useNavigate();
   const { logoutAdmin } = useAuth();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(readSidebarCollapsed);
   const [showProfile, setShowProfile] = useState(false);
   const profileRef = useRef(null);
   const currentOutlet = useOutlet();
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(SIDEBAR_COLLAPSED_KEY, String(sidebarCollapsed));
+    } catch {
+      /* ignore storage errors */
+    }
+  }, [sidebarCollapsed]);
 
   useEffect(() => {
     const handler = (e) => { if (profileRef.current && !profileRef.current.contains(e.target)) setShowProfile(false); };
@@ -20,56 +40,87 @@ export default function AdminLayout() {
   }, []);
 
   const basePath = location.pathname.startsWith('/demo/admin') ? '/demo/admin' : '/admin';
+  const unreadReportCount = useUnreadReportCount();
 
   const menu = [
     { name: 'Dashboard',    path: `${basePath}/dashboard`, icon: LayoutDashboard },
-    { name: 'Segnalazioni', path: `${basePath}/reports`,   icon: MessageSquareWarning },
+    { name: 'Segnalazioni', path: `${basePath}/reports`,   icon: MessageSquareWarning, badge: unreadReportCount },
     { name: 'Impostazioni', path: `${basePath}/settings`,  icon: SettingsIcon },
   ];
 
   const isActive = (path) => location.pathname.includes(path);
 
+  const toggleSidebarCollapsed = () => setSidebarCollapsed((v) => !v);
+
   const NavLinks = () => (
     <>
       {menu.map((item) => (
-        <a
+        <Link
           key={item.path}
-          onClick={() => { navigate(item.path); setIsMenuOpen(false); }}
+          onClick={() => setIsMenuOpen(false)}
+          to={item.path}
           className={`admin-nav-link ${isActive(item.path) ? 'active' : ''}`}
-          style={{ cursor: 'pointer' }}
+          style={{ cursor: 'pointer', borderRight: 'none' }}
+          id={`admin-nav-${item.name.toLowerCase()}`}
+          title={sidebarCollapsed ? item.name : undefined}
+          aria-label={sidebarCollapsed ? item.name : undefined}
         >
-          <item.icon size={19} />
-          {item.name}
-        </a>
+          <span className="admin-nav-icon" aria-hidden="true">
+            <item.icon size={18} strokeWidth={2.5} />
+          </span>
+          <span className="admin-nav-label">{item.name}</span>
+          {item.badge > 0 && (
+            <span
+              className="notification-badge admin-nav-badge"
+              aria-label={`${item.badge} segnalazioni non lette`}
+            >
+              {item.badge}
+            </span>
+          )}
+        </Link>
       ))}
     </>
   );
 
   return (
-    <div className="admin-container">
+    <div className={`admin-container${sidebarCollapsed ? ' admin-sidebar-collapsed' : ''}`}>
 
       {/* Mobile Top Bar */}
       <div className="admin-mobile-topbar">
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <span style={{ fontSize: '1.2rem', fontWeight: 800 }}>
-            <span style={{ color: 'var(--color-primary)' }}>Dillo</span> Qui
-          </span>
+          <BrandWordmark compact />
+          <span style={{ fontSize: '0.72rem', fontWeight: 700, background: 'var(--b-yellow)', border: '2px solid var(--b-black)', padding: '2px 8px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Admin</span>
         </div>
         <button
           onClick={() => setIsMenuOpen(!isMenuOpen)}
-          style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-text-main)', padding: 4 }}
+          style={{ background: isMenuOpen ? 'var(--b-yellow)' : 'var(--b-white)', border: '2px solid var(--b-black)', cursor: 'pointer', color: 'var(--b-black)', padding: 6, display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '2px 2px 0 var(--b-black)' }}
+          id="admin-menu-toggle"
+          aria-label={isMenuOpen ? 'Chiudi menu admin' : 'Apri menu admin'}
+          aria-expanded={isMenuOpen}
+          aria-controls="admin-sidebar-menu"
         >
-          {isMenuOpen ? <X size={26} /> : <Menu size={26} />}
+          {isMenuOpen ? <X size={22} strokeWidth={3} /> : <Menu size={22} strokeWidth={2.5} />}
         </button>
       </div>
 
       {/* Sidebar Desktop / Dropdown Mobile */}
-      <aside className={`admin-sidebar ${isMenuOpen ? 'open' : ''}`}>
-        {/* Logo desktop */}
+      <aside className={`admin-sidebar ${isMenuOpen ? 'open' : ''}`} id="admin-sidebar-menu">
+        {/* Logo desktop + collapse toggle */}
         <div className="admin-sidebar-logo admin-sidebar-header">
-          <span className="admin-sidebar-logo-text">
-            <span style={{ color: 'var(--color-primary)' }}>Dillo</span> Qui
-          </span>
+          <div className="admin-sidebar-brand">
+            <BrandWordmark compact />
+            <span className="admin-sidebar-admin-tag">Admin</span>
+          </div>
+          <button
+            type="button"
+            className="admin-sidebar-toggle"
+            onClick={toggleSidebarCollapsed}
+            aria-label={sidebarCollapsed ? 'Espandi barra laterale' : 'Comprimi barra laterale'}
+            aria-expanded={!sidebarCollapsed}
+            id="admin-sidebar-collapse-toggle"
+          >
+            {sidebarCollapsed ? <PanelLeftOpen size={18} strokeWidth={2.5} /> : <PanelLeftClose size={18} strokeWidth={2.5} />}
+          </button>
         </div>
 
         <nav className="admin-nav">
@@ -80,26 +131,31 @@ export default function AdminLayout() {
         <div className="admin-sidebar-footer">
           <div style={{ position: 'relative' }} ref={profileRef}>
             <button
-              className="admin-nav-link"
-              style={{ width: '100%', border: 'none', cursor: 'pointer', background: 'transparent' }}
+              className="admin-nav-link admin-profile-btn"
+              style={{ width: '100%', border: 'none', cursor: 'pointer', background: 'transparent', borderBottom: 'none' }}
               onClick={() => setShowProfile(!showProfile)}
+              id="admin-profile-btn"
+              aria-label="Apri menu profilo admin"
+              aria-expanded={showProfile}
+              aria-controls="admin-profile-menu"
+              title={sidebarCollapsed ? 'Profilo admin' : undefined}
             >
-              <div className="profile-avatar-btn" style={{ width: 28, height: 28, fontSize: '0.75rem', flexShrink: 0 }}>
-                <User size={14} />
+              <div className="admin-profile-avatar" aria-hidden="true">
+                <User size={14} strokeWidth={2.5} />
               </div>
-              Admin
+              <span className="admin-nav-label">Admin</span>
             </button>
             {showProfile && (
-              <div className="profile-popup" style={{ bottom: '100%', top: 'auto', marginBottom: 8, left: 0, right: 'auto', width: '100%' }}>
+              <div className={`profile-popup admin-profile-popup${sidebarCollapsed ? ' admin-profile-popup--collapsed' : ''}`} id="admin-profile-menu">
                 <button className="profile-popup-item" onClick={() => { setShowProfile(false); navigate(`${basePath}/profile`); }}>
-                  <User size={16} /> Il mio Profilo
+                  <User size={15} /> Il mio Profilo
                 </button>
                 <button className="profile-popup-item" onClick={() => { setShowProfile(false); navigate(`${basePath}/settings`); }}>
-                  <Settings size={16} /> Impostazioni Scuola
+                  <Settings size={15} /> Impostazioni
                 </button>
                 <div className="profile-popup-divider" />
                 <button className="profile-popup-item danger" onClick={() => logoutAdmin()}>
-                  <LogOut size={16} /> Esci
+                  <LogOut size={15} /> Esci
                 </button>
               </div>
             )}
@@ -109,18 +165,7 @@ export default function AdminLayout() {
 
       {/* Main content */}
       <main className="admin-main">
-        <AnimatePresence mode="wait">
-          <motion.div
-            key={location.pathname}
-            initial={{ opacity: 0, y: 10, filter: 'blur(2px)' }}
-            animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
-            exit={{ opacity: 0, y: -10, filter: 'blur(2px)' }}
-            transition={{ duration: 0.2 }}
-            style={{ width: '100%', height: '100%' }}
-          >
-            {currentOutlet}
-          </motion.div>
-        </AnimatePresence>
+        {currentOutlet}
       </main>
     </div>
   );

@@ -1,8 +1,8 @@
 import { Link, useLocation, useParams, useNavigate, useOutlet } from 'react-router-dom';
 import { Home, PlusCircle, History, LogOut, Settings, User } from 'lucide-react';
-import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '../context/AuthContext';
 import { useState, useRef, useEffect } from 'react';
+import BrandWordmark from '../components/BrandWordmark';
 
 export default function StudentLayout() {
   const { slug } = useParams();
@@ -15,7 +15,6 @@ export default function StudentLayout() {
 
   const isActive = (path) => location.pathname.includes(path);
 
-  // Chiudi popup se clicchi fuori
   useEffect(() => {
     const handler = (e) => { if (profileRef.current && !profileRef.current.contains(e.target)) setShowProfile(false); };
     document.addEventListener('mousedown', handler);
@@ -23,10 +22,9 @@ export default function StudentLayout() {
   }, []);
 
   const tabs = [
-    { name: 'Home',    path: `/box/${slug}/forum`,   icon: Home,       id: 'forum' },
+    { name: 'Forum',   path: `/box/${slug}/forum`,   icon: Home,       id: 'forum' },
     { name: 'Nuova',   path: `/box/${slug}/new`,     icon: PlusCircle, id: 'new', isNew: true },
     { name: 'Storico', path: `/box/${slug}/history`, icon: History,    id: 'history' },
-    { name: 'Profilo', path: `/box/${slug}/profile`, icon: User,       id: 'profile' },
   ];
 
   return (
@@ -36,50 +34,53 @@ export default function StudentLayout() {
         <div className="student-nav-inner">
           {/* Brand */}
           <Link to={`/box/${slug}/forum`} className="student-nav-brand" style={{ textDecoration: 'none' }}>
-            <div className="student-nav-brand-text">
-              <span className="brand-dillo">Dillo</span>
-              <span className="brand-qui"> Qui</span>
-            </div>
+            <BrandWordmark />
           </Link>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
             {/* Desktop links */}
             <div className="student-nav-links desktop-nav" style={{ gap: 4 }}>
-              {tabs.filter(t => t.id !== 'profile').map(tab => (
+              {tabs.map(tab => (
                 <Link
                   key={tab.id}
                   to={tab.path}
                   style={{
                     display: 'flex', alignItems: 'center', gap: 6,
-                    padding: '8px 14px', borderRadius: 10, textDecoration: 'none',
-                    fontSize: '0.875rem', fontWeight: 600,
-                    color: isActive(tab.id) ? 'var(--color-primary)' : 'var(--color-text-muted)',
-                    background: isActive(tab.id) ? 'var(--color-primary-lighter)' : 'transparent',
-                    transition: '0.15s',
+                    padding: '8px 14px', textDecoration: 'none',
+                    fontSize: '0.78rem', fontWeight: 800,
+                    textTransform: 'uppercase', letterSpacing: '0.04em',
+                    color: isActive(tab.id) ? 'var(--b-black)' : 'var(--b-gray)',
+                    background: isActive(tab.id) ? 'var(--b-yellow)' : 'transparent',
+                    border: isActive(tab.id) ? '2px solid var(--b-black)' : '2px solid transparent',
+                    transition: '0.1s',
                   }}
                 >
-                  <tab.icon size={15} /> {tab.name}
+                  <tab.icon size={14} /> {tab.name}
                 </Link>
               ))}
             </div>
 
-            {/* Profile avatar + popup (all screens) */}
+            {/* Profile button */}
             <div style={{ position: 'relative' }} ref={profileRef}>
               <button
                 className="profile-avatar-btn"
                 onClick={() => setShowProfile(!showProfile)}
+                id="student-profile-btn"
+                aria-label="Apri menu profilo studente"
+                aria-expanded={showProfile}
+                aria-controls="student-profile-menu"
               >
-                <User size={18} />
+                <User size={17} strokeWidth={2.5} />
               </button>
 
               {showProfile && (
-                <div className="profile-popup">
+                <div className="profile-popup" id="student-profile-menu">
                   <button className="profile-popup-item" onClick={() => { setShowProfile(false); navigate(`/box/${slug}/profile`); }}>
-                    <Settings size={16} /> Impostazioni
+                    <Settings size={15} /> Impostazioni
                   </button>
                   <div className="profile-popup-divider" />
                   <button className="profile-popup-item danger" onClick={() => { setShowProfile(false); logoutStudent(); }}>
-                    <LogOut size={16} /> Esci
+                    <LogOut size={15} /> Esci
                   </button>
                 </div>
               )}
@@ -90,38 +91,39 @@ export default function StudentLayout() {
 
       {/* Main content */}
       <main className="student-main-content">
-        <AnimatePresence mode="wait">
-          <motion.div
-            key={location.pathname}
-            initial={{ opacity: 0, y: 10, filter: 'blur(2px)' }}
-            animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
-            exit={{ opacity: 0, y: -10, filter: 'blur(2px)' }}
-            transition={{ duration: 0.2 }}
-            style={{ width: '100%', height: '100%' }}
-          >
-            {currentOutlet}
-          </motion.div>
-        </AnimatePresence>
+        {currentOutlet}
       </main>
 
       {/* Bottom Tab Bar (mobile) */}
       <div className="student-tab-bar">
         <div className="student-tab-bar-inner">
-          {tabs.filter(t => t.id !== 'profile').map(tab => {
+          {tabs.map(tab => {
             const active = isActive(tab.id);
             return (
               <button
                 key={tab.id}
                 className={`tab-item ${active ? 'active' : ''} ${tab.isNew ? 'tab-new' : ''}`}
                 onClick={() => navigate(tab.path)}
+                id={`tab-${tab.id}`}
               >
                 <div className="tab-icon-wrap">
-                  <tab.icon size={tab.isNew ? 22 : 20} />
+                  <tab.icon size={tab.isNew ? 22 : 19} strokeWidth={2.5} />
                 </div>
                 <span>{tab.name}</span>
               </button>
             );
           })}
+          {/* Profile tab mobile */}
+          <button
+            className={`tab-item ${isActive('profile') ? 'active' : ''}`}
+            onClick={() => navigate(`/box/${slug}/profile`)}
+            id="tab-profile"
+          >
+            <div className="tab-icon-wrap">
+              <User size={19} strokeWidth={2.5} />
+            </div>
+            <span>Profilo</span>
+          </button>
         </div>
       </div>
     </div>

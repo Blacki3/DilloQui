@@ -1,32 +1,42 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { requestCode, verifyCode } from '../services/api';
-import { Mail, ShieldCheck, AlertCircle, CheckCircle } from 'lucide-react';
+import { getSettings, normalizeEmail, normalizeSlug } from '../services/mockSettings';
+import { getStudentProfile, saveStudentProfile } from '../services/mockProfiles';
+import { Mail, ShieldCheck, AlertCircle, CheckCircle, ArrowRight } from 'lucide-react';
 
 export default function Verify({ slug }) {
-  const [email, setEmail] = useState(slug === 'demo' ? 'mail@nomescuola.edu.it' : '');
+  // Preload del bundle principale in background mentre l'utente è in questa pagina
+  useEffect(() => {
+    import('../bundles/AppBundle');
+  }, []);
+
+  const existingProfile = getStudentProfile();
+  const [email, setEmail] = useState(slug === 'demo' ? 'mail@nomescuola.edu.it' : existingProfile.email || '');
   const [otpDigits, setOtpDigits] = useState(slug === 'demo' ? ['1', '2', '3', '4', '5', '6'] : ['', '', '', '', '', '']);
   const [step, setStep] = useState(1);
-  const [nome, setNome] = useState(slug === 'demo' ? 'Mario' : '');
-  const [cognome, setCognome] = useState(slug === 'demo' ? 'Rossi' : '');
-  const [classe, setClasse] = useState(slug === 'demo' ? '3B' : '');
+  const [nome, setNome] = useState(existingProfile.nome || (slug === 'demo' ? 'Mario' : ''));
+  const [cognome, setCognome] = useState(existingProfile.cognome || (slug === 'demo' ? 'Rossi' : ''));
+  const [classe, setClasse] = useState(existingProfile.classe || (slug === 'demo' ? '3B' : ''));
   const [loading, setLoading] = useState(false);
-  const isClassRequired = true; // Mock: se l'admin ha attivato l'obbligo classe
+  const settings = getSettings();
+  const isClassRequired = settings.requireClass;
   const [msg, setMsg] = useState({ text: '', isSuccess: false });
   const { loginStudent } = useAuth();
   const inputRefs = useRef([]);
 
-  const displaySlugName = slug ? slug.toUpperCase() : 'SCUOLA';
-
   const handleSendCode = async (e) => {
     e.preventDefault();
-    const trimmedEmail = email.trim().toLowerCase();
+    const trimmedEmail = normalizeEmail(email);
     if (!trimmedEmail) { setMsg({ text: 'Inserisci la tua email', isSuccess: false }); return; }
     setLoading(true);
     try {
       const res = await requestCode(trimmedEmail, slug);
       setMsg({ text: res.message, isSuccess: res.success });
-      if (res.success) setStep(2);
+      if (res.success) {
+        setEmail(trimmedEmail);
+        setStep(2);
+      }
     } catch { setMsg({ text: 'Errore di rete', isSuccess: false }); }
     finally { setLoading(false); }
   };
@@ -54,7 +64,6 @@ export default function Verify({ slug }) {
       const res = await verifyCode(email, code, slug);
       if (res.success) {
         setMsg({ text: 'Codice corretto!', isSuccess: true });
-        // In un app reale: if (res.isFirstLogin) setStep(3); else loginStudent(res.token);
         setStep(3);
       } else {
         setMsg({ text: res.message, isSuccess: false });
@@ -66,48 +75,69 @@ export default function Verify({ slug }) {
   return (
     <div className="app-container">
       <div className="verify-card">
-        
-        {/* Logo */}
-        <div className="verify-logo">
-          <ShieldCheck size={72} color="var(--color-primary)" strokeWidth={1.5} />
+
+        {/* Header con step indicator */}
+        <div style={{ marginBottom: 24 }}>
+          <div style={{ display: 'flex', gap: 6, marginBottom: 20, justifyContent: 'center' }}>
+            {[1, 2, 3].map(s => (
+              <div key={s} style={{
+                height: 4, flex: 1,
+                background: s <= step ? 'var(--b-yellow)' : 'var(--b-gray-l)',
+                border: '1px solid var(--b-black)',
+              }} />
+            ))}
+          </div>
+
+          {/* Logo */}
+          <div className="verify-logo">
+            <div style={{
+              width: 64, height: 64, background: 'var(--b-yellow)',
+              border: 'var(--b-border)', display: 'flex', alignItems: 'center',
+              justifyContent: 'center', boxShadow: 'var(--b-shadow)',
+            }}>
+              <ShieldCheck size={34} color="var(--b-black)" strokeWidth={2.5} />
+            </div>
+          </div>
         </div>
 
-        {step === 1 ? (
+        {/* Slug pill */}
+        <div className="slug-pill" style={{ marginBottom: 20 }}>
+          <span style={{ color: 'var(--b-gray)' }}>dilloqui.app/box/</span>
+          <span style={{ color: 'var(--b-black)', fontWeight: 800 }}>{slug?.toLowerCase()}</span>
+        </div>
+
+        {step === 1 && (
           <>
-            <h2>Verifica Accesso</h2>
-            {/* Sottodominio visualizzato come pill */}
-            <div style={{
-              display: 'inline-flex', alignItems: 'center', gap: 0,
-              background: '#f0f7f0', border: '1.5px solid var(--color-primary-light)',
-              borderRadius: 50, padding: '6px 16px', margin: '0 auto 24px',
-              fontSize: '0.85rem', fontWeight: 600,
-            }}>
-              <span style={{ color: 'var(--color-text-muted)' }}>dilloqui.app/box/</span>
-              <span style={{ color: 'var(--color-primary)' }}>{slug?.toLowerCase()}</span>
-            </div>
+            <h2 style={{ marginBottom: 6 }}>VERIFICA ACCESSO</h2>
+            <p className="verify-slug">Inserisci la tua email scolastica per ricevere il codice OTP</p>
 
             <form onSubmit={handleSendCode}>
               <div className="email-input-wrapper">
-                <Mail size={18} />
+                <Mail size={18} strokeWidth={2.5} />
                 <div className="divider" />
                 <input
                   type="email"
-                  placeholder="es. nome.cognome@scuola.edu.it"
+                  placeholder="nome.cognome@scuola.edu.it"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   autoComplete="email"
+                  id="verify-email-input"
                 />
               </div>
 
-              <button type="submit" className="btn-primary" disabled={loading}>
-                {loading ? 'Invio in corso...' : 'Invia codice OTP'}
+              <button type="submit" className="btn-primary" disabled={loading} id="verify-send-btn">
+                {loading ? '⏳ Invio in corso...' : <>Invia Codice OTP <ArrowRight size={16} strokeWidth={3} /></>}
               </button>
             </form>
           </>
-        ) : (
+        )}
+
+        {step === 2 && (
           <>
-            <h2>Inserisci Codice OTP</h2>
-            <p className="verify-slug">Codice di verifica inviato a <strong>{email}</strong></p>
+            <h2 style={{ marginBottom: 6 }}>CODICE OTP</h2>
+            <p className="verify-slug">
+              Inviato a <strong style={{ color: 'var(--b-black)', fontFamily: "'IBM Plex Mono', monospace", fontSize: '0.88rem' }}>{email}</strong>
+            </p>
 
             <form onSubmit={handleVerify}>
               <div className="otp-inputs">
@@ -122,80 +152,74 @@ export default function Verify({ slug }) {
                     onChange={(e) => handleOtpChange(i, e.target.value)}
                     onKeyDown={(e) => handleOtpKeyDown(i, e)}
                     autoFocus={i === 0}
+                    id={`otp-digit-${i}`}
                   />
                 ))}
               </div>
 
-              <button type="submit" className="btn-primary" disabled={loading}>
-                {loading ? 'Verifica in corso...' : 'Verifica Codice'}
+              <button type="submit" className="btn-primary" disabled={loading} id="verify-otp-btn">
+                {loading ? '⏳ Verifica...' : <>Verifica Codice <ArrowRight size={16} strokeWidth={3} /></>}
+              </button>
+            </form>
+
+            <button
+              onClick={() => setStep(1)}
+              style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--b-gray)', fontSize: '0.85rem', fontWeight: 700, textDecoration: 'underline', marginTop: 12, fontFamily: "'Space Grotesk', sans-serif" }}
+            >
+              ← Cambia email
+            </button>
+          </>
+        )}
+
+        {step === 3 && (
+          <>
+            <h2 style={{ marginBottom: 6 }}>COMPLETA PROFILO</h2>
+            <p className="verify-slug">Dicci chi sei prima di iniziare</p>
+
+            <form onSubmit={(e) => {
+              e.preventDefault();
+              if (!nome.trim() || !cognome.trim() || (isClassRequired && !classe.trim())) {
+                setMsg({ text: 'Compila tutti i campi obbligatori', isSuccess: false });
+                return;
+              }
+              const normalizedSlug = normalizeSlug(slug) || 'demo';
+              saveStudentProfile({
+                ...existingProfile,
+                email: normalizeEmail(email),
+                nome: nome.trim(),
+                cognome: cognome.trim(),
+                classe: isClassRequired ? classe.trim() : '',
+              });
+              setMsg({ text: 'Profilo completato! Accesso in corso...', isSuccess: true });
+              setTimeout(() => loginStudent(`mock-session-${normalizedSlug}-${Date.now()}`), 600);
+            }}>
+              <label>Nome</label>
+              <input placeholder="Mario" value={nome} onChange={(e) => setNome(e.target.value)} required id="verify-nome" />
+              <label>Cognome</label>
+              <input placeholder="Rossi" value={cognome} onChange={(e) => setCognome(e.target.value)} required id="verify-cognome" />
+              {isClassRequired && (
+                <>
+                  <label>Classe</label>
+                  <input placeholder="Es. 3B" value={classe} onChange={(e) => setClasse(e.target.value)} required id="verify-classe" />
+                </>
+              )}
+              <button type="submit" className="btn-primary" style={{ marginTop: 4 }} id="verify-complete-btn">
+                Entra nello Sportello →
               </button>
             </form>
           </>
         )}
 
-        {step === 3 && (
-          <div style={{ marginTop: 20 }}>
-            <h2>Completa il Profilo</h2>
-            <p className="verify-slug">Dicci chi sei prima di iniziare</p>
-
-            <form onSubmit={(e) => {
-              e.preventDefault();
-              if(!nome.trim() || !cognome.trim() || (isClassRequired && !classe.trim())) {
-                setMsg({ text: 'Compila tutti i campi obbligatori', isSuccess: false });
-                return;
-              }
-              // Simulazione salvataggio profilo e login
-              setMsg({ text: 'Profilo completato! Accesso in corso...', isSuccess: true });
-              setTimeout(() => {
-                loginStudent('mock-token');
-              }, 600);
-            }}>
-              <div className="email-input-wrapper" style={{ marginBottom: 12 }}>
-                <input 
-                  placeholder="Nome" 
-                  value={nome} 
-                  onChange={(e) => setNome(e.target.value)} 
-                  required 
-                />
-              </div>
-              <div className="email-input-wrapper" style={{ marginBottom: 12 }}>
-                <input 
-                  placeholder="Cognome" 
-                  value={cognome} 
-                  onChange={(e) => setCognome(e.target.value)} 
-                  required 
-                />
-              </div>
-              {isClassRequired && (
-                <div className="email-input-wrapper" style={{ marginBottom: 12 }}>
-                  <input 
-                    placeholder="Classe (es. 3B)" 
-                    value={classe} 
-                    onChange={(e) => setClasse(e.target.value)} 
-                    required 
-                  />
-                </div>
-              )}
-
-              <button type="submit" className="btn-primary" style={{ marginTop: 12 }}>
-                Entra nello Sportello
-              </button>
-            </form>
-          </div>
-        )}
-
         {msg.text && (
-          <div className={`msg ${msg.isSuccess ? 'success' : 'error'}`}>
-            {msg.isSuccess
-              ? <CheckCircle size={16} />
-              : <AlertCircle size={16} />}
+          <div className={`msg ${msg.isSuccess ? 'success' : 'error'}`} style={{ marginTop: 14 }}>
+            {msg.isSuccess ? <CheckCircle size={16} strokeWidth={2.5} /> : <AlertCircle size={16} strokeWidth={2.5} />}
             {msg.text}
           </div>
         )}
 
         <div className="verify-footer">
-          Non hai ancora uno spazio Dillo Qui?{' '}
-          <a href="#">Registrati</a>
+          Non hai ancora uno spazio DILLOQUI?{' '}
+          <a href="/admin/login">Registrati</a>
         </div>
       </div>
     </div>

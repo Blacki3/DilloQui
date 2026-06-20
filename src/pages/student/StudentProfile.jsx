@@ -1,61 +1,126 @@
-import { useState, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
-import { 
-  Bell, Globe, Shield, Download, FileText, Lock, HelpCircle, 
-  ChevronRight, BadgeCheck, LogOut, Check, Camera, User, ArrowLeft
+import { getSettings } from '../../services/mockSettings';
+import { getStudentProfile, patchStudentProfile } from '../../services/mockProfiles';
+import {
+  Bell, Globe, Shield, Download, FileText, Lock, HelpCircle,
+  ChevronRight, LogOut, User, ArrowLeft, BadgeCheck
 } from 'lucide-react';
+
+function BrutRow({ icon: Icon, label, sublabel, right, onClick }) {
+  return (
+    <div
+      onClick={onClick}
+      role={onClick ? 'button' : undefined}
+      tabIndex={onClick ? 0 : undefined}
+      onKeyDown={(e) => {
+        if (!onClick) return;
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          onClick();
+        }
+      }}
+      style={{
+        display: 'flex', alignItems: 'center', gap: 14,
+        padding: '14px 18px',
+        borderBottom: '2px solid var(--b-black)',
+        background: 'var(--b-white)', cursor: onClick ? 'pointer' : 'default',
+        transition: 'background 0.1s',
+      }}
+      onMouseEnter={e => { if (onClick) e.currentTarget.style.background = 'var(--b-cream)'; }}
+      onMouseLeave={e => e.currentTarget.style.background = 'var(--b-white)'}
+    >
+      <div style={{ width: 36, height: 36, background: 'var(--b-yellow)', border: '2px solid var(--b-black)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+        <Icon size={17} strokeWidth={2.5} />
+      </div>
+      <span style={{ flex: 1, fontWeight: 700, fontSize: '0.9rem' }}>
+        {label}
+        {sublabel && <div style={{ fontSize: '0.75rem', color: 'var(--b-gray)', fontWeight: 500 }}>{sublabel}</div>}
+      </span>
+      {right}
+      {onClick && !right && <ChevronRight size={16} strokeWidth={2.5} color="var(--b-gray)" />}
+    </div>
+  );
+}
+
+function BrutToggle({ on, onClick }) {
+  return (
+    <button
+      onClick={e => { e.stopPropagation(); onClick(); }}
+      aria-label={on ? 'Disattiva opzione' : 'Attiva opzione'}
+      aria-pressed={on}
+      style={{
+        width: 48, height: 26, background: on ? 'var(--b-yellow)' : 'var(--b-gray-l)',
+        border: '2px solid var(--b-black)', cursor: 'pointer',
+        position: 'relative', flexShrink: 0, transition: 'background 0.1s',
+        fontFamily: "'Space Grotesk', sans-serif",
+      }}
+    >
+      <div style={{
+        position: 'absolute', top: 2, left: on ? 22 : 2,
+        width: 18, height: 18, background: 'var(--b-black)',
+        transition: 'left 0.12s',
+      }} />
+    </button>
+  );
+}
 
 export default function StudentProfile({ email = 'student@scuola.edu.it' }) {
   const { logoutStudent } = useAuth();
-  const navigate = useNavigate();
-  const [notifications, setNotifications] = useState(false);
-  const [defaultAnon, setDefaultAnon] = useState(true);
+  const savedProfile = getStudentProfile();
+  const { requireClass } = getSettings();
+  const [notifications, setNotifications] = useState(savedProfile.notifications);
+  const [defaultAnon, setDefaultAnon] = useState(savedProfile.defaultAnon);
   const [isEditingProfile, setIsEditingProfile] = useState(false);
-  
-  // Campi anagrafici
-  const [nome, setNome] = useState('Mario');
-  const [cognome, setCognome] = useState('Rossi');
-  const [classe, setClasse] = useState('3B');
+  const [nome, setNome] = useState(savedProfile.nome);
+  const [cognome, setCognome] = useState(savedProfile.cognome);
+  const [classe, setClasse] = useState(savedProfile.classe);
+  const profileEmail = savedProfile.email || email;
 
-  const fileInputRef = useRef(null);
-
-  // Initials from email
-  const initials = email.split('@')[0].slice(0, 2).toUpperCase();
-
-  const handleImageClick = () => {
-    if (fileInputRef.current) fileInputRef.current.click();
-  };
-
-  const handleFileChange = (e) => {
-    const file = e.target.files[0];
-    if (file) console.log('Selected file:', file.name);
-  };
+  const initials = profileEmail.split('@')[0].slice(0, 2).toUpperCase();
 
   if (isEditingProfile) {
     return (
       <div style={{ maxWidth: 480, margin: '0 auto' }}>
-        <div style={{ display: 'flex', alignItems: 'center', marginBottom: 24 }}>
-          <button onClick={() => setIsEditingProfile(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-text-main)', display: 'flex', alignItems: 'center', gap: 8, fontWeight: 600 }}>
-            <ArrowLeft size={20} /> Indietro
-          </button>
-        </div>
-        <h2 style={{ color: 'var(--color-text-main)', marginBottom: 20 }}>Dati Personali</h2>
-        <div className="flat-panel" style={{ padding: '20px' }}>
-          <div style={{ marginBottom: 16 }}>
-            <label style={{ display: 'block', fontSize: '0.85rem', color: 'var(--color-text-muted)', marginBottom: 6, fontWeight: 600 }}>Nome</label>
-            <input value={nome} onChange={e => setNome(e.target.value)} style={{ width: '100%', border: '1px solid #e5e7eb', padding: '10px 14px', borderRadius: 8, fontSize: '1rem', outline: 'none' }} />
-          </div>
-          <div style={{ marginBottom: 16 }}>
-            <label style={{ display: 'block', fontSize: '0.85rem', color: 'var(--color-text-muted)', marginBottom: 6, fontWeight: 600 }}>Cognome</label>
-            <input value={cognome} onChange={e => setCognome(e.target.value)} style={{ width: '100%', border: '1px solid #e5e7eb', padding: '10px 14px', borderRadius: 8, fontSize: '1rem', outline: 'none' }} />
-          </div>
-          <div style={{ marginBottom: 24 }}>
-            <label style={{ display: 'block', fontSize: '0.85rem', color: 'var(--color-text-muted)', marginBottom: 6, fontWeight: 600 }}>Classe</label>
-            <input value={classe} onChange={e => setClasse(e.target.value)} placeholder="Opzionale" style={{ width: '100%', border: '1px solid #e5e7eb', padding: '10px 14px', borderRadius: 8, fontSize: '1rem', outline: 'none' }} />
-          </div>
-          <button className="btn-primary" onClick={() => setIsEditingProfile(false)} style={{ width: '100%' }}>
-            Salva Modifiche
+        <button
+          onClick={() => setIsEditingProfile(false)}
+          style={{
+            display: 'flex', alignItems: 'center', gap: 8,
+            background: 'var(--b-white)', border: 'var(--b-border)',
+            cursor: 'pointer', fontWeight: 800, fontSize: '0.78rem',
+            textTransform: 'uppercase', letterSpacing: '0.04em',
+            padding: '8px 14px', boxShadow: 'var(--b-shadow-sm)',
+            marginBottom: 20, fontFamily: "'Space Grotesk', sans-serif",
+          }}
+          id="profile-back-btn"
+        >
+          <ArrowLeft size={15} strokeWidth={3} /> Indietro
+        </button>
+        <h2 style={{ textTransform: 'uppercase', marginBottom: 16 }}>Dati Personali</h2>
+        <div className="flat-panel">
+          <label>Nome</label>
+          <input value={nome} onChange={e => setNome(e.target.value)} id="profile-nome" />
+          <label>Cognome</label>
+          <input value={cognome} onChange={e => setCognome(e.target.value)} id="profile-cognome" />
+          {requireClass && (
+            <>
+              <label>Classe</label>
+              <input value={classe} onChange={e => setClasse(e.target.value)} placeholder="Es. 3B" id="profile-classe" />
+            </>
+          )}
+          <button
+            className="btn-primary"
+            onClick={() => {
+              patchStudentProfile({
+                nome: nome.trim(),
+                cognome: cognome.trim(),
+                classe: requireClass ? classe.trim() : '',
+              });
+              setIsEditingProfile(false);
+            }}
+            id="profile-save-btn"
+          >
+            Salva Modifiche ✓
           </button>
         </div>
       </div>
@@ -64,104 +129,107 @@ export default function StudentProfile({ email = 'student@scuola.edu.it' }) {
 
   return (
     <div style={{ maxWidth: 480, margin: '0 auto' }}>
-      {/* Avatar + info */}
-      <div className="settings-avatar-wrap">
-        <div className="settings-avatar" onClick={handleImageClick}>
+      {/* Avatar Card */}
+      <div style={{
+        background: 'var(--b-black)', border: '3px solid var(--b-black)',
+        boxShadow: 'var(--b-shadow-lg)', padding: '28px 24px',
+        display: 'flex', flexDirection: 'column', alignItems: 'center',
+        textAlign: 'center', marginBottom: 20,
+      }}>
+        <div style={{
+          width: 72, height: 72, background: 'var(--b-yellow)',
+          border: '3px solid var(--b-yellow)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          fontWeight: 800, fontSize: '1.5rem', color: 'var(--b-black)',
+          fontFamily: "'IBM Plex Mono', monospace",
+          marginBottom: 14, boxShadow: '4px 4px 0 var(--b-yellow)',
+        }}>
           {initials}
-          <div className="settings-avatar-badge" style={{ background: '#4b5563', border: '2px solid white' }}>
-            <Camera size={14} color="white" />
-          </div>
         </div>
-        <input 
-          type="file" 
-          accept="image/*" 
-          ref={fileInputRef} 
-          style={{ display: 'none' }} 
-          onChange={handleFileChange}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
+          <BadgeCheck size={14} color="var(--b-yellow)" strokeWidth={2.5} />
+          <span style={{ color: 'var(--b-yellow)', fontWeight: 800, fontSize: '0.78rem', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Verificato</span>
+        </div>
+        <div style={{ fontFamily: "'IBM Plex Mono', monospace", color: '#FFFFFF99', fontSize: '0.88rem', fontWeight: 600 }}>{profileEmail}</div>
+        <div style={{ marginTop: 8, color: '#FFFFFF66', fontSize: '0.72rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+          {requireClass ? `${nome} ${cognome} • Classe ${classe || '--'}` : `${nome} ${cognome}`}
+        </div>
+      </div>
+
+      {/* Sezione Account */}
+      <div style={{ fontSize: '0.68rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.09em', color: 'var(--b-gray)', marginBottom: 6, marginLeft: 2 }}>Account</div>
+      <div style={{ border: '3px solid var(--b-black)', boxShadow: 'var(--b-shadow)', marginBottom: 20 }}>
+        <BrutRow icon={User} label="Dati Personali" onClick={() => setIsEditingProfile(true)} />
+        <BrutRow
+          icon={Bell}
+          label="Notifiche Push"
+          right={(
+            <BrutToggle
+              on={notifications}
+              onClick={() => {
+                const next = !notifications;
+                setNotifications(next);
+                patchStudentProfile({ notifications: next });
+              }}
+            />
+          )}
         />
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontWeight: 600, fontSize: '0.875rem' }}>
-          <BadgeCheck size={14} color="var(--color-primary)" /> Verificato
-        </div>
-        <div className="settings-email">{email}</div>
-      </div>
-
-      {/* Impostazioni */}
-      <div className="settings-section-label">Account</div>
-      <div style={{ borderRadius: 14, overflow: 'hidden', marginBottom: 20, boxShadow: 'var(--shadow-card)' }}>
-        <div className="settings-row" onClick={() => setIsEditingProfile(true)}>
-          <User size={20} className="settings-row-icon" />
-          <span className="settings-row-label">Dati Personali</span>
-          <ChevronRight size={16} className="settings-row-arrow" />
-        </div>
-        <div className="settings-row">
-          <Bell size={20} className="settings-row-icon" />
-          <span className="settings-row-label">Notifiche Push</span>
-          <button
-            className={`toggle-switch ${notifications ? 'on' : ''}`}
-            onClick={(e) => { e.stopPropagation(); setNotifications(!notifications); }}
-          />
-        </div>
-        <div className="settings-row">
-          <Globe size={20} className="settings-row-icon" />
-          <span className="settings-row-label">Lingua</span>
-          <span className="settings-row-value">Italiano</span>
-          <ChevronRight size={16} className="settings-row-arrow" />
+        <div style={{ borderBottom: 'none' }}>
+          <BrutRow icon={Globe} label="Lingua" right={<span style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--b-gray)', marginRight: 8 }}>Italiano</span>} onClick={() => {}} />
         </div>
       </div>
 
-      {/* Privacy */}
-      <div className="settings-section-label">Privacy</div>
-      <div style={{ borderRadius: 14, overflow: 'hidden', marginBottom: 20, boxShadow: 'var(--shadow-card)' }}>
-        <div className="settings-row">
-          <Shield size={20} className="settings-row-icon" />
-          <span className="settings-row-label" style={{ lineHeight: 1.3 }}>
-            Anonimato predefinito<br />
-            <span style={{ fontSize: '0.78rem', fontWeight: 400, color: 'var(--color-text-muted)' }}>per nuove segnalazioni</span>
-          </span>
-          <button
-            className={`toggle-switch ${defaultAnon ? 'on' : ''}`}
-            onClick={() => setDefaultAnon(!defaultAnon)}
-          />
-        </div>
-        <div className="settings-row">
-          <Download size={20} className="settings-row-icon" />
-          <span className="settings-row-label">Esporta i miei dati</span>
-          <ChevronRight size={16} className="settings-row-arrow" />
-        </div>
-      </div>
-
-      {/* Informazioni */}
-      <div className="settings-section-label">Informazioni</div>
-      <div style={{ borderRadius: 14, overflow: 'hidden', marginBottom: 28, boxShadow: 'var(--shadow-card)' }}>
-        <div className="settings-row">
-          <FileText size={20} className="settings-row-icon" />
-          <span className="settings-row-label">Regole dell'App</span>
-          <ChevronRight size={16} className="settings-row-arrow" />
-        </div>
-        <div className="settings-row">
-          <Lock size={20} className="settings-row-icon" />
-          <span className="settings-row-label">Informativa sulla Privacy</span>
-          <ChevronRight size={16} className="settings-row-arrow" />
-        </div>
-        <div className="settings-row">
-          <HelpCircle size={20} className="settings-row-icon" />
-          <span className="settings-row-label">Supporto</span>
-          <ChevronRight size={16} className="settings-row-arrow" />
+      {/* Sezione Privacy */}
+      <div style={{ fontSize: '0.68rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.09em', color: 'var(--b-gray)', marginBottom: 6, marginLeft: 2 }}>Privacy</div>
+      <div style={{ border: '3px solid var(--b-black)', boxShadow: 'var(--b-shadow)', marginBottom: 20 }}>
+        <BrutRow
+          icon={Shield}
+          label="Anonimato Predefinito"
+          sublabel="per nuove segnalazioni"
+          right={(
+            <BrutToggle
+              on={defaultAnon}
+              onClick={() => {
+                const next = !defaultAnon;
+                setDefaultAnon(next);
+                patchStudentProfile({ defaultAnon: next });
+              }}
+            />
+          )}
+        />
+        <div style={{ borderBottom: 'none' }}>
+          <BrutRow icon={Download} label="Esporta i miei dati" onClick={() => {}} />
         </div>
       </div>
 
-      {/* Esci */}
+      {/* Sezione Info */}
+      <div style={{ fontSize: '0.68rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.09em', color: 'var(--b-gray)', marginBottom: 6, marginLeft: 2 }}>Informazioni</div>
+      <div style={{ border: '3px solid var(--b-black)', boxShadow: 'var(--b-shadow)', marginBottom: 24 }}>
+        <BrutRow icon={FileText}    label="Regole dell'App" onClick={() => {}} />
+        <BrutRow icon={Lock}        label="Informativa sulla Privacy" onClick={() => {}} />
+        <div style={{ borderBottom: 'none' }}>
+          <BrutRow icon={HelpCircle} label="Supporto" onClick={() => {}} />
+        </div>
+      </div>
+
+      {/* Logout */}
       <button
         onClick={logoutStudent}
-        className="btn-primary"
         style={{
-          background: 'white',
-          color: 'var(--color-danger)',
-          border: '2px solid var(--color-danger)',
-          fontWeight: 700,
+          display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+          width: '100%', padding: '14px 24px',
+          background: 'var(--b-white)', color: 'var(--b-red)',
+          border: '3px solid var(--b-red)', fontWeight: 800,
+          cursor: 'pointer', fontSize: '0.9rem', textTransform: 'uppercase',
+          letterSpacing: '0.05em', boxShadow: '4px 4px 0 var(--b-red)',
+          transition: 'box-shadow 0.1s, transform 0.1s',
+          fontFamily: "'Space Grotesk', sans-serif",
         }}
+        onMouseEnter={e => { e.currentTarget.style.boxShadow = '6px 6px 0 var(--b-red)'; e.currentTarget.style.transform = 'translate(-1px,-1px)'; }}
+        onMouseLeave={e => { e.currentTarget.style.boxShadow = '4px 4px 0 var(--b-red)'; e.currentTarget.style.transform = 'none'; }}
+        id="profile-logout-btn"
       >
-        <LogOut size={18} /> Esci
+        <LogOut size={17} strokeWidth={2.5} /> Esci dall'Account
       </button>
     </div>
   );

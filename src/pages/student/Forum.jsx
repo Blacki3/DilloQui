@@ -1,99 +1,104 @@
-import { useState } from 'react';
-import { ThumbsUp, ThumbsDown, MessageSquare } from 'lucide-react';
+import { ThumbsUp, ThumbsDown, MessageSquare, ArrowRight, PlusCircle } from 'lucide-react';
 import { useNavigate, useParams } from 'react-router-dom';
-
-const initialPosts = [
-  {
-    id: 1,
-    author: 'Anonimo',
-    category: 'Proposta',
-    title: 'Distributore acqua potabile',
-    content: 'Sarebbe fantastico installare un distributore d\'acqua potabile per ridurre la plastica delle bottigliette in classe.',
-    likes: 45,
-    comments: 2,
-    time: '2 ore fa',
-    userVote: 0
-  },
-  {
-    id: 2,
-    author: 'Mario Rossi',
-    category: 'Problema',
-    title: 'Riscaldamento rotto al piano terra',
-    content: 'Nelle aule del piano terra fa freddissimo da due giorni. Qualcuno ha avvisato i tecnici?',
-    likes: 89,
-    comments: 34,
-    time: 'ieri',
-    userVote: 0
-  },
-];
-
-const categoryClass = {
-  Problema: 'badge badge-problema',
-  Proposta:  'badge badge-proposta',
-  Dubbio:    'badge badge-dubbio',
-};
+import { useReports, voteReport, displayAuthor, getTypeLabel, getTypeBadgeClass } from '../../services/mockStore';
 
 export default function Forum() {
-  const [posts, setPosts] = useState(initialPosts);
+  const posts = useReports()
+    .filter((item) => item.isPublic)
+    .sort((a, b) => b.createdAt - a.createdAt);
   const navigate = useNavigate();
   const { slug } = useParams();
 
   const handleVote = (e, postId, value) => {
     e.stopPropagation();
-    setPosts(posts.map(post => {
-      if (post.id !== postId) return post;
-      if (post.userVote === value) return { ...post, likes: post.likes - value, userVote: 0 };
-      return { ...post, likes: post.likes + value - post.userVote, userVote: value };
-    }));
+    voteReport(postId, value);
   };
 
   return (
     <div>
-      <h1 style={{ marginBottom: 4 }}>Bacheca Studenti</h1>
-      <p style={{ color: 'var(--color-text-muted)', marginBottom: 24, fontSize: '0.9rem' }}>
-        Scopri e supporta le idee e le segnalazioni degli studenti.
-      </p>
+      {/* Header */}
+      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 24, gap: 12, flexWrap: 'wrap' }}>
+        <div>
+          <h1 style={{ marginBottom: 4, textTransform: 'uppercase' }}>Bacheca</h1>
+          <p style={{ color: 'var(--b-gray)', fontSize: '0.9rem', fontWeight: 600 }}>
+            Scopri e supporta le segnalazioni degli studenti.
+          </p>
+        </div>
+        <button
+          className="btn-orange"
+          onClick={() => navigate(`/box/${slug}/new`)}
+          id="forum-new-report-btn"
+        >
+          <PlusCircle size={16} strokeWidth={2.5} /> Nuova
+        </button>
+      </div>
 
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-        {posts.map(post => (
-          <div
-            key={post.id}
-            className="forum-post-card"
-            onClick={() => navigate(`/box/${slug}/post/${post.id}`)}
-          >
-            {/* Colonna voti */}
-            <div className="forum-vote-col">
-              <button
-              className={`vote-btn vote-btn-up ${post.userVote === 1 ? 'active' : ''}`}
-                onClick={(e) => handleVote(e, post.id, 1)}
-              >
-                <ThumbsUp size={17} />
-              </button>
-              <span className="vote-count">{post.likes}</span>
-              <button
-                className={`vote-btn vote-btn-down ${post.userVote === -1 ? 'active' : ''}`}
-                onClick={(e) => handleVote(e, post.id, -1)}
-              >
-                <ThumbsDown size={17} />
-              </button>
-            </div>
+      {/* Post list */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+        {posts.map(post => {
+          const typeLabel = getTypeLabel(post.type);
+          const badgeClass = getTypeBadgeClass(post.type);
+          const stripeStyle = post.type ? { background: `var(--b-${post.type === 'problema' ? 'red' : post.type === 'proposta' ? 'blue' : 'orange'})` } : { background: 'var(--b-gray)' };
+          return (
+            <div
+              key={post.id}
+              className="forum-post-card"
+              onClick={() => navigate(`/box/${slug}/post/${post.id}`)}
+              role="button"
+              tabIndex={0}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  navigate(`/box/${slug}/post/${post.id}`);
+                }
+              }}
+              aria-label={`Apri segnalazione: ${post.title}`}
+              id={`post-card-${post.id}`}
+            >
+              {/* Stripe categoria */}
+              <div className="forum-cat-stripe" style={stripeStyle} />
 
-            {/* Contenuto */}
-            <div className="forum-post-content">
-              <div className="forum-post-meta">
-                <span className={categoryClass[post.category] || 'badge'}>{post.category}</span>
-                <span style={{ fontWeight: 600, fontSize: '0.875rem' }}>{post.author}</span>
-                <span style={{ color: 'var(--color-text-muted)', fontSize: '0.8rem', marginLeft: 'auto' }}>{post.time}</span>
+              {/* Colonna voti */}
+              <div className="forum-vote-col">
+                <button
+                  className={`vote-btn vote-btn-up ${post.userVote === 1 ? 'active' : ''}`}
+                  onClick={(e) => handleVote(e, post.id, 1)}
+                  aria-label={`Vota positivamente ${post.title}`}
+                  id={`vote-up-${post.id}`}
+                >
+                  <ThumbsUp size={16} strokeWidth={2.5} />
+                </button>
+                <span className="vote-count">{post.likes}</span>
+                <button
+                  className={`vote-btn vote-btn-down ${post.userVote === -1 ? 'active' : ''}`}
+                  onClick={(e) => handleVote(e, post.id, -1)}
+                  aria-label={`Vota negativamente ${post.title}`}
+                  id={`vote-down-${post.id}`}
+                >
+                  <ThumbsDown size={16} strokeWidth={2.5} />
+                </button>
               </div>
-              <div className="forum-post-title">{post.title}</div>
-              <div className="forum-post-body">{post.content}</div>
-              <div className="forum-post-footer">
-                <MessageSquare size={15} />
-                {post.comments} Commenti
+
+              {/* Contenuto */}
+              <div className="forum-post-content">
+                <div className="forum-post-meta">
+                  <span className={badgeClass}>{typeLabel}</span>
+                  <span style={{ fontWeight: 700, fontSize: '0.82rem', color: 'var(--b-gray)', textTransform: 'uppercase', letterSpacing: '0.03em' }}>{displayAuthor(post)}</span>
+                  <span style={{ color: 'var(--b-gray)', fontSize: '0.78rem', marginLeft: 'auto', fontFamily: "'IBM Plex Mono', monospace" }}>{post.time}</span>
+                </div>
+                <div className="forum-post-title">{post.title}</div>
+                <div className="forum-post-body">{post.content}</div>
+                <div className="forum-post-footer">
+                  <MessageSquare size={14} strokeWidth={2.5} />
+                  {post.comments.length} Commenti
+                  <span style={{ marginLeft: 'auto', color: 'var(--b-black)', fontWeight: 800 }}>
+                    Leggi <ArrowRight size={12} strokeWidth={3} style={{ display: 'inline', verticalAlign: 'middle' }} />
+                  </span>
+                </div>
               </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
     </div>
   );
