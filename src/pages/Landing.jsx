@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
+import { AnimatePresence, motion } from 'framer-motion';
 import {
   Zap, CheckCircle2, ArrowRight,
   Users, Landmark, Building2, Clock,
@@ -22,18 +23,18 @@ const BookStackIcon = ({ size = 24 }) => (
 );
 
 const features = [
-  { icon: IncognitoIcon, tone: 'yellow', title: 'Segnalazioni Anonime', desc: 'Gli studenti segnalano senza paura. Risposte più oneste, sempre.' },
-  { icon: LinkIcon, tone: 'blue', title: 'Un Link, Tutto Dentro', desc: 'Nessuna app da scaricare. Basta condividere il link della box.' },
-  { icon: Users, tone: 'orange', title: 'Per Classe o Istituto', desc: 'Funziona per il singolo rappresentante di classe e per quello d\'istituto.' },
-  { icon: Zap, tone: 'yellow', title: 'Pronto in 5 Minuti', desc: 'Registrazione, configurazione e link condiviso: tutto in meno di 5 minuti.' },
-  { icon: Tags, tone: 'blue', title: 'Categorie Personalizzate', desc: 'Organizza le segnalazioni per argomento — didattica, strutture, clima.' },
-  { icon: BookStackIcon, tone: 'black', title: 'Pensato per le Scuole', desc: 'Non uno strumento generico: nato per il contesto scolastico italiano.' },
+  { icon: IncognitoIcon, tone: 'yellow', title: 'SEGNALAZIONI ANONIME', desc: 'Gli studenti segnalano senza paura. Risposte più oneste, sempre.' },
+  { icon: LinkIcon, tone: 'blue', title: 'UN LINK, TUTTO DENTRO', desc: 'Nessuna app da scaricare. Basta condividere il link della box.' },
+  { icon: Users, tone: 'orange', title: 'PER CLASSE O ISTITUTO', desc: 'Funziona per il singolo rappresentante di classe e per quello d\'istituto.' },
+  { icon: Zap, tone: 'yellow', title: 'PRONTO IN 5 MINUTI', desc: 'Registrazione, configurazione e link condiviso: tutto in meno di 5 minuti.' },
+  { icon: Tags, tone: 'blue', title: 'CATEGORIE PERSONALIZZATE', desc: 'Organizza le segnalazioni per argomento — didattica, strutture, clima.' },
+  { icon: BookStackIcon, tone: 'black', title: 'PENSATO PER LE SCUOLE', desc: 'Non è uno strumento generico, è pensato appositamente per la scuola.' },
 ];
 
 const steps = [
   { n: '01', title: 'Crei lo Sportello', desc: 'Ti registri, scegli il nome della box e ottieni un link unico da condividere.', tone: 'yellow' },
   { n: '02', title: 'Condividi il Link', desc: 'Inserisci il link nel gruppo classe, sul registro o nella bacheca virtuale.', tone: 'orange' },
-  { n: '03', title: 'I Compagni Segnalano', desc: 'Chiunque abbia una email scolastica accede con OTP e segnala.', tone: 'blue' },
+  { n: '03', title: 'I Compagni Segnalano', desc: 'Chiunque abbia una email scolastica abilitata accede con OTP e segnala.', tone: 'blue' },
   { n: '04', title: 'Rispondi e Agisci', desc: 'Gestisci le segnalazioni dal pannello, rispondi in privato e segni cosa è stato risolto.', tone: 'black' },
 ];
 
@@ -70,9 +71,7 @@ export default function Landing() {
           </h1>
 
           <p className="landing-hero-subtitle">
-            DILLOQUI è lo sportello di ascolto digitale per{' '}
-            <span className="landing-accent-yellow">rappresentanti d'istituto e di classe</span>.
-            Offre uno spazio sicuro per segnalazioni anonime, dialogo diretto e risoluzione efficace dei problemi.
+            Non tutti hanno il coraggio di farsi ascoltare. DILLOQUI permette a ogni studente di segnalare disagi e problemi in modo sicuro e anonimo. La base perfetta per costruire una scuola basata sulle <span className="landing-accent-yellow">necessità reali.</span>
           </p>
 
           <div className="landing-hero-cta">
@@ -92,25 +91,28 @@ export default function Landing() {
           <div className="landing-section-head">
             <div className="section-label">Per chi è</div>
             <h2 className="landing-title">
-              Rappresentanti &<br /><span className="landing-highlight">Scuole.</span>
+              Non è il solito<br /><span className="landing-highlight">sondaggio.</span>
             </h2>
           </div>
 
           <div className="landing-grid-two">
             <div className="landing-card">
-              <div className="landing-mini-badge landing-mini-badge-light">
-                <Building2 size={12} strokeWidth={3} /> Istituti Scolastici
+              <div className="landing-card-header">
+                <div className="landing-mini-badge landing-mini-badge-light">
+                  <Building2 size={12} strokeWidth={3} /> Istituti Scolastici
+                </div>
+                <h3 className="landing-card-title">Sei un istituto?</h3>
+                <p className="landing-card-copy">
+                  Dai ai tuoi studenti un canale strutturato e sicuro per esprimersi, senza infrastrutture da gestire
+                </p>
               </div>
-              <h3 className="landing-card-title">Sei un istituto?</h3>
-              <p className="landing-card-copy">
-                Dai ai tuoi studenti un canale strutturato e sicuro per esprimersi, senza infrastrutture da gestire.
-              </p>
-              <div className="landing-check-list">
+
+              <div className="landing-check-list left-card-list">
                 {[
-                  'Canale d\'ascolto ufficiale e strutturato',
-                  'Nessuna infrastruttura da gestire',
+                  'Spazio d\'ascolto ufficiale',
+                  'Zero stress per i tecnici della scuola',
+                  'Privacy e anonimato blindati',
                   'Scalabilità su più classi',
-                  'Adozione semplice per tutta la scuola',
                 ].map((t) => (
                   <div key={t} className="landing-check-item">
                     <div className="landing-check-icon">
@@ -123,10 +125,10 @@ export default function Landing() {
               <div className="landing-info-box-wrap">
                 <div className="landing-info-box">
                   <div className="landing-info-icon">
-                    <Clock size={18} strokeWidth={2.5} />
+                    <Clock size={16} strokeWidth={2.5} />
                   </div>
                   <div>
-                    <div className="landing-info-title">Subito Operativo</div>
+                    <div className="landing-info-title">Subito operativo</div>
                     <p className="landing-info-copy">
                       Affida la gestione ai rappresentanti eletti. Non serve il team IT.
                     </p>
@@ -136,19 +138,21 @@ export default function Landing() {
             </div>
 
             <div className="landing-card landing-card-accent">
-              <div className="landing-mini-badge landing-mini-badge-dark">
-                <Megaphone size={12} strokeWidth={3} /> Rappresentanti
+              <div className="landing-card-header">
+                <div className="landing-mini-badge landing-mini-badge-dark">
+                  <Megaphone size={12} strokeWidth={3} /> Rappresentanti
+                </div>
+                <h3 className="landing-card-title">Sei un rappresentante?</h3>
+                <p className="landing-card-copy-dark">
+                  Hai finalmente uno strumento concreto per raccogliere i feedback della tua classe o del tuo istituto.
+                </p>
               </div>
-              <h3 className="landing-card-title">Sei un rappresentante?</h3>
-              <p className="landing-card-copy-dark">
-                Hai finalmente uno strumento concreto per raccogliere i feedback della tua classe o del tuo istituto.
-              </p>
               <div className="landing-check-list">
                 {[
                   'Box dedicata alla tua classe o istituto',
-                  'Tutte le segnalazioni in un posto solo',
-                  'Porta dati concreti alle riunioni',
-                  'Rispondi ai compagni in modo riservato',
+                  'Rispondi in privato e in anonimo',
+                  'Fatti prendere sul serio ai Consigli',
+                  'Decidi tu le categorie dei problemi',
                 ].map((t) => (
                   <div key={t} className="landing-check-item">
                     <div className="landing-check-icon dark">
@@ -176,20 +180,32 @@ export default function Landing() {
                   ))}
                 </div>
                 <div className="landing-role-box">
-                  <div className="landing-role-icon">
-                    {ruolo === 'classe' ? <Users size={18} strokeWidth={2.5} /> : <Landmark size={18} strokeWidth={2.5} />}
-                  </div>
-                  <div>
-                    <div className="landing-role-title">
-                      {ruolo === 'classe' ? 'Rappresentante di Classe' : 'Rappresentante d\'Istituto'}
-                    </div>
-                    <p className="landing-role-copy">
-                      {ruolo === 'classe'
-                        ? 'Crea una box limitata alla tua classe. I tuoi compagni segnalano e tu ascolti, pronto per riportarlo ai prof e al Dirigente.'
-                        : 'Apri una box d\'istituto. Raccogli le segnalazioni di tutti gli studenti per assemblee e consigli.'
-                      }
-                    </p>
-                  </div>
+                  <AnimatePresence mode="wait">
+                    <motion.div
+                      className="landing-role-inner"
+                      key={ruolo}
+                      initial={{ opacity: 0, y: 5 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: -5 }}
+                      transition={{ duration: 0.15 }}
+                      style={{ display: 'flex', gap: '16px', alignItems: 'flex-start' }}
+                    >
+                      <div className="landing-role-icon">
+                        {ruolo === 'classe' ? <Users size={16} strokeWidth={2.5} /> : <Landmark size={16} strokeWidth={2.5} />}
+                      </div>
+                      <div>
+                        <div className="landing-role-title">
+                          {ruolo === 'classe' ? 'RAPPRESENTANTE DI CLASSE' : "RAPPRESENTANTE D'ISTITUTO"}
+                        </div>
+                        <p className="landing-role-copy">
+                          {ruolo === 'classe'
+                            ? 'Crea una box limitata alla tua classe. I tuoi compagni segnalano e tu ascolti, pronto per riportarlo ai prof e al Dirigente.'
+                            : 'Apri una box d\'istituto. Raccogli le segnalazioni di tutti gli studenti per assemblee e consigli.'
+                          }
+                        </p>
+                      </div>
+                    </motion.div>
+                  </AnimatePresence>
                 </div>
               </div>
             </div>
@@ -251,18 +267,15 @@ export default function Landing() {
 
       <section className="landing-final-cta">
         <div className="landing-container center">
-          <div className="section-label section-label-dark">
-            <Eye size={12} strokeWidth={3} style={{ display: 'inline', verticalAlign: 'middle', marginRight: 6 }} />
-            Facile da attivare, semplice da usare
-          </div>
+
           <h2 className="landing-final-title">
-            Sei il rappresentante?<br />Allora hai uno<br /><span className="landing-highlight-dark">strumento in più.</span>
+            SEI IL RAPPRESENTANTE?<br />ALLORA HAI UNO<br /><span className="landing-highlight-dark">STRUMENTO IN PIÙ.</span>
           </h2>
           <p className="landing-final-copy">
-            Crea la box, condividi il link ai tuoi compagni e inizia ad ascoltare. Non ti chiediamo nulla di tecnico.
+            Non c'è niente da installare Crea la box, condividi il link ai tuoi compagni e inizia ad ascoltare.
           </p>
           <button onClick={() => navigate('/admin/login')} className="landing-final-btn" id="cta-crea-box">
-            Crea la tua Box <ArrowRight size={22} strokeWidth={3} />
+            Apri la tua Box ORA <ArrowRight size={22} strokeWidth={3} />
           </button>
         </div>
       </section>
@@ -285,9 +298,7 @@ export default function Landing() {
           ))}
         </div>
         <div className="landing-footer-divider" />
-        <p className="landing-footer-copy">
-          Progetto Marilli — Hackathon 2026
-        </p>
+
         <p className="landing-footer-copy small">
           © 2026 DILLOQUI. Tutti i diritti riservati.
         </p>

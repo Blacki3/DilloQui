@@ -1,13 +1,13 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { Menu, X, ArrowRight, ChevronRight } from 'lucide-react';
 import BrandWordmark from './BrandWordmark';
 
 const NAV_LINKS = [
-  { label: 'Home',          path: '/' },
-  { label: 'Funzionalità',  path: '#funzionalita' },
+  { label: 'Home', path: '/' },
+  { label: 'Funzionalità', path: '#funzionalita' },
   { label: 'Come Funziona', path: '#come-funziona' },
-  { label: 'Chi Siamo',     path: '/chi-siamo' },
+  { label: 'Chi Siamo', path: '/chi-siamo' },
 ];
 
 const getScrollBehavior = () => (
@@ -26,14 +26,58 @@ export default function Navbar() {
   const navigate = useNavigate();
   const location = useLocation();
   const [menuOpen, setMenuOpen] = useState(false);
+  const [activeItem, setActiveItem] = useState('/');
+  const isClickScrolling = useRef(false);
 
   useEffect(() => {
     setMenuOpen(false);
   }, [location.pathname]);
 
+  useEffect(() => {
+    const handleScroll = () => {
+      if (isClickScrolling.current) return;
+
+      if (location.pathname !== '/') {
+        setActiveItem(location.pathname);
+        return;
+      }
+
+      let current = '/';
+      const sections = NAV_LINKS.filter(l => l.path.startsWith('#')).map(l => l.path.substring(1));
+
+      for (const section of sections) {
+        const el = document.getElementById(section);
+        if (el) {
+          const rect = el.getBoundingClientRect();
+          if (rect.top <= window.innerHeight / 2) {
+            current = `#${section}`;
+          }
+        }
+      }
+
+      if (window.scrollY < 100) {
+        current = '/';
+      }
+
+      setActiveItem(current);
+    };
+
+    window.addEventListener('scroll', handleScroll);
+    handleScroll();
+
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, [location.pathname]);
+
   const handleNavClick = (e, path) => {
     e.preventDefault();
     setMenuOpen(false);
+
+    isClickScrolling.current = true;
+    setActiveItem(path);
+    setTimeout(() => {
+      isClickScrolling.current = false;
+    }, 2500); // Wait for smooth scroll to finish
+
     if (path.startsWith('#')) {
       const id = decodeURIComponent(path.slice(1));
       if (location.pathname === '/') {
@@ -64,7 +108,7 @@ export default function Navbar() {
                 key={l.label}
                 href={l.path}
                 onClick={(e) => handleNavClick(e, l.path)}
-                className="public-navbar-link"
+                className={`public-navbar-link ${activeItem === l.path ? 'active' : ''}`}
                 id={`nav-${l.label.toLowerCase().replace(' ', '-')}`}
               >
                 {l.label}
@@ -100,7 +144,7 @@ export default function Navbar() {
               key={item.label}
               href={item.path}
               onClick={(e) => handleNavClick(e, item.path)}
-              className="public-mobile-link"
+              className={`public-mobile-link ${activeItem === item.path ? 'active' : ''}`}
             >
               {item.label} <ChevronRight size={18} strokeWidth={3} />
             </a>

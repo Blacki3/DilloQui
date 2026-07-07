@@ -2,11 +2,17 @@
 <!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 20010904//EN"
  "http://www.w3.org/TR/2001/REC-SVG-20010904/DTD/svg10.dtd">
 <svg version="1.0" xmlns="http://www.w3.org/2000/svg"
- width="1408.000000pt" height="768.000000pt" viewBox="0 0 1408.000000 768.000000"
+ width="100%" height="100%" viewBox="370 125 658 553"
  preserveAspectRatio="xMidYMid meet">
-
-<g transform="translate(0.000000,768.000000) scale(0.100000,-0.100000)"
-fill="#000000" stroke="none">
+<style>
+  /* TEMA CHIARO: Tutta l'icona è Nera */
+  .logo-path { fill: #0A0A0A; }
+  /* TEMA SCURO: Tutta l'icona è Gialla */
+  @media (prefers-color-scheme: dark) {
+    .logo-path { fill: #FFD600; }
+  }
+</style>
+<g transform="translate(0.000000,768.000000) scale(0.100000,-0.100000)" stroke="none" class="logo-path">
 <path d="M8695 6219 c-568 -17 -2702 -76 -3080 -85 -137 -3 -261 -7 -275 -9
 -14 -2 -107 -4 -207 -4 l-183 -1 0 -279 0 -279 203 -6 c111 -3 578 -13 1037
 -21 938 -17 2122 -41 2457 -51 l223 -6 306 -314 306 -313 5 -853 6 -853 -75

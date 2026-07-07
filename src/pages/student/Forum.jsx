@@ -1,11 +1,31 @@
-import { ThumbsUp, ThumbsDown, MessageSquare, ArrowRight, PlusCircle } from 'lucide-react';
+import { useState } from 'react';
+import { ThumbsUp, ThumbsDown, MessageSquare, ArrowRight, PlusCircle, Search, Filter, ArrowUpDown } from 'lucide-react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useReports, voteReport, displayAuthor, getTypeLabel, getTypeBadgeClass } from '../../services/mockStore';
 
 export default function Forum() {
-  const posts = useReports()
-    .filter((item) => item.isPublic)
-    .sort((a, b) => b.createdAt - a.createdAt);
+  const [search, setSearch] = useState('');
+  const [filterType, setFilterType] = useState('all'); // all, problema, proposta, dubbio
+  const [sortOrder, setSortOrder] = useState('recent'); // recent, popular
+  
+  const allPosts = useReports().filter((item) => item.isPublic);
+
+  const posts = allPosts
+    .filter(post => {
+      if (filterType !== 'all' && post.type !== filterType) return false;
+      if (search.trim()) {
+        const query = search.toLowerCase();
+        return post.title.toLowerCase().includes(query) || post.content.toLowerCase().includes(query);
+      }
+      return true;
+    })
+    .sort((a, b) => {
+      if (sortOrder === 'popular') {
+        return b.likes - a.likes || b.createdAt - a.createdAt;
+      }
+      return b.createdAt - a.createdAt;
+    });
+
   const navigate = useNavigate();
   const { slug } = useParams();
 
@@ -17,7 +37,7 @@ export default function Forum() {
   return (
     <div>
       {/* Header */}
-      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 24, gap: 12, flexWrap: 'wrap' }}>
+      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 16, gap: 12, flexWrap: 'wrap' }}>
         <div>
           <h1 style={{ marginBottom: 4, textTransform: 'uppercase' }}>Bacheca</h1>
           <p style={{ color: 'var(--b-gray)', fontSize: '0.9rem', fontWeight: 600 }}>
@@ -31,6 +51,49 @@ export default function Forum() {
         >
           <PlusCircle size={16} strokeWidth={2.5} /> Nuova
         </button>
+      </div>
+
+      {/* Toolbar (Search & Filters) */}
+      <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 24, alignItems: 'center' }}>
+        <div style={{ flex: '1 1 250px', position: 'relative' }}>
+          <Search size={16} strokeWidth={2.5} style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: 'var(--b-gray)' }} />
+          <input
+            type="text"
+            placeholder="Cerca per parola chiave..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            style={{ width: '100%', paddingLeft: 38, paddingRight: 12, paddingTop: 10, paddingBottom: 10, border: '2px solid var(--b-black)', fontFamily: "'Space Grotesk', sans-serif", fontSize: '0.85rem', fontWeight: 700 }}
+            id="forum-search-input"
+          />
+        </div>
+        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+          <div style={{ position: 'relative' }}>
+            <select
+              value={filterType}
+              onChange={(e) => setFilterType(e.target.value)}
+              style={{ appearance: 'none', padding: '10px 32px 10px 14px', border: '2px solid var(--b-black)', background: 'var(--b-white)', fontFamily: "'Space Grotesk', sans-serif", fontSize: '0.8rem', fontWeight: 800, textTransform: 'uppercase', color: 'var(--b-black)', cursor: 'pointer' }}
+              id="forum-filter-select"
+            >
+              <option value="all">Tutte le Categorie</option>
+              <option value="problema">Problemi</option>
+              <option value="proposta">Proposte</option>
+              <option value="dubbio">Dubbi</option>
+            </select>
+            <Filter size={14} strokeWidth={3} style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }} />
+          </div>
+          <div style={{ position: 'relative' }}>
+            <select
+              value={sortOrder}
+              onChange={(e) => setSortOrder(e.target.value)}
+              style={{ appearance: 'none', padding: '10px 32px 10px 14px', border: '2px solid var(--b-black)', background: 'var(--b-white)', fontFamily: "'Space Grotesk', sans-serif", fontSize: '0.8rem', fontWeight: 800, textTransform: 'uppercase', color: 'var(--b-black)', cursor: 'pointer' }}
+              id="forum-sort-select"
+            >
+              <option value="recent">Più Recenti</option>
+              <option value="popular">Più Votate</option>
+            </select>
+            <ArrowUpDown size={14} strokeWidth={3} style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }} />
+          </div>
+        </div>
       </div>
 
       {/* Post list */}
@@ -91,8 +154,8 @@ export default function Forum() {
                 <div className="forum-post-footer">
                   <MessageSquare size={14} strokeWidth={2.5} />
                   {post.comments.length} Commenti
-                  <span style={{ marginLeft: 'auto', color: 'var(--b-black)', fontWeight: 800 }}>
-                    Leggi <ArrowRight size={12} strokeWidth={3} style={{ display: 'inline', verticalAlign: 'middle' }} />
+                  <span className="forum-read-more" style={{ marginLeft: 'auto', color: 'var(--b-black)', fontWeight: 800 }}>
+                    Leggi <ArrowRight className="read-more-icon" size={12} strokeWidth={3} style={{ display: 'inline', verticalAlign: 'middle' }} />
                   </span>
                 </div>
               </div>

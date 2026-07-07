@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { Lock, Eye, CheckCircle2, X, Send, MessageSquare, ArrowLeft } from 'lucide-react';
 import { useReports, addMessage, setStatus, STATUS, STATUS_LABEL, STATUS_BADGE_CLASS } from '../../services/mockStore';
 
@@ -12,6 +12,7 @@ export default function MyReports() {
   const [openChat, setOpenChat] = useState(null);
   const [chatInput, setChatInput] = useState('');
   const [confirmClose, setConfirmClose] = useState(null);
+  const chatEndRef = useRef(null);
 
   const filtered = reports.filter(r => {
     if (activeFilter === 'Tutti') return true;
@@ -29,6 +30,9 @@ export default function MyReports() {
     if (!chatInput.trim()) return;
     addMessage(reportId, { text: chatInput.trim(), isAdmin: false, author: 'Tu' });
     setChatInput('');
+    setTimeout(() => {
+      chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }, 100);
   };
 
   const openReport = reports.find(r => r.id === openChat);
@@ -101,6 +105,7 @@ export default function MyReports() {
               </div>
             </div>
           ))}
+          <div ref={chatEndRef} />
         </div>
 
         {/* Azioni stato */}

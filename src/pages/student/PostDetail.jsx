@@ -1,6 +1,6 @@
 import { useParams, useNavigate } from 'react-router-dom';
 import { ThumbsUp, ThumbsDown, ArrowLeft, Send, MessageSquare } from 'lucide-react';
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import {
   useReport,
   addComment,
@@ -17,6 +17,7 @@ export default function PostDetail() {
   const navigate = useNavigate();
   const [newComment, setNewComment] = useState('');
   const post = useReport(postId);
+  const commentsEndRef = useRef(null);
 
   const handleVote = (value) => {
     if (!post) return;
@@ -28,6 +29,9 @@ export default function PostDetail() {
     if (!newComment.trim()) return;
     addComment(post.id, { text: newComment.trim(), author: 'Tu' });
     setNewComment('');
+    setTimeout(() => {
+      commentsEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }, 100);
   };
 
   if (!post) {
@@ -159,6 +163,7 @@ export default function PostDetail() {
             <p style={{ color: 'var(--b-black)', margin: 0, lineHeight: 1.55, fontSize: '0.9rem' }}>{comment.text}</p>
           </div>
         ))}
+        <div ref={commentsEndRef} />
       </div>
     </div>
   );

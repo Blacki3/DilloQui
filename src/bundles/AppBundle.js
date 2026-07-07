@@ -10,5 +10,3 @@ export { default as PostDetail } from '../pages/student/PostDetail';
 export { default as NewReport } from '../pages/student/NewReport';
 export { default as MyReports } from '../pages/student/MyReports';
 export { default as StudentProfile } from '../pages/student/StudentProfile';
-
-export { default as DemoSwitcher } from '../components/demo/DemoSwitcher';

@@ -81,41 +81,7 @@ export default function About() {
         </div>
       </section>
 
-      {/* ── DA STUDENTI, PER STUDENTI ── */}
-      <section style={{ padding: '100px 24px', background: 'var(--b-yellow)', borderTop: '3px solid var(--b-black)', borderBottom: '3px solid var(--b-black)' }}>
-        <div style={{ maxWidth: 1000, margin: '0 auto', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: 32, alignItems: 'stretch' }}>
-          <div style={{ padding: '40px', background: 'var(--b-white)', border: '3px solid var(--b-black)', boxShadow: 'var(--b-shadow-lg)' }}>
-            <div style={{
-              display: 'inline-flex', alignItems: 'center', gap: 8,
-              background: 'var(--b-blue)', border: '2px solid var(--b-black)',
-              padding: '6px 14px', fontSize: '0.85rem', fontWeight: 800,
-              color: '#ffffff', marginBottom: 24, textTransform: 'uppercase',
-            }}>
-              <Users size={16} strokeWidth={2.5} /> Da studenti, per studenti
-            </div>
-            <h3 style={{ fontSize: '1.5rem', fontWeight: 900, marginBottom: 16, textTransform: 'uppercase' }}>Nato dalla scuola reale</h3>
-            <p style={{ color: 'var(--b-gray)', lineHeight: 1.7, fontSize: '1rem', margin: 0, fontWeight: 500 }}>
-              Non è uno strumento generico calato dall'alto: è pensato per il contesto scolastico italiano,
-              a partire dall'esperienza diretta di chi la scuola la vive ogni giorno.
-            </p>
-          </div>
-          <div style={{ padding: '40px', background: 'var(--b-white)', border: '3px solid var(--b-black)', boxShadow: 'var(--b-shadow-lg)' }}>
-            <div style={{
-              display: 'inline-flex', alignItems: 'center', gap: 8,
-              background: 'var(--b-orange)', border: '2px solid var(--b-black)',
-              padding: '6px 14px', fontSize: '0.85rem', fontWeight: 800,
-              color: '#ffffff', marginBottom: 24, textTransform: 'uppercase',
-            }}>
-              <Megaphone size={16} strokeWidth={2.5} /> Il nostro obiettivo
-            </div>
-            <h3 style={{ fontSize: '1.5rem', fontWeight: 900, marginBottom: 16, textTransform: 'uppercase' }}>Trasformare l'ascolto in azione</h3>
-            <p style={{ color: 'var(--b-gray)', lineHeight: 1.7, fontSize: '1rem', margin: 0, fontWeight: 500 }}>
-              Vogliamo che ogni segnalazione diventi un'occasione di miglioramento concreto,
-              dando ai rappresentanti dati reali da portare a professori, consigli e dirigenza.
-            </p>
-          </div>
-        </div>
-      </section>
+
 
       {/* ── CTA ── */}
       <section style={{ padding: '100px 24px', background: 'var(--b-bg)', textAlign: 'center' }}>

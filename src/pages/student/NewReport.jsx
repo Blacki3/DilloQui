@@ -21,9 +21,24 @@ export default function NewReport() {
   const [problema, setProblema] = useState('');
   const [loading, setLoading] = useState(false);
   const [showPopup, setShowPopup] = useState(false);
+  const [error, setError] = useState('');
 
   const handleInvia = async (e) => {
     e.preventDefault();
+    if (titolo.trim().length < 5) {
+      setError('Il titolo deve contenere almeno 5 caratteri.');
+      return;
+    }
+    if (problema.trim().length < 20) {
+      setError('La descrizione deve contenere almeno 20 caratteri.');
+      return;
+    }
+    if (!tipo && !categoryOptions.includes(tipo)) {
+      setError('Seleziona una categoria valida.');
+      return;
+    }
+    
+    setError('');
     setLoading(true);
     setTimeout(() => {
       addReport({
@@ -61,16 +76,25 @@ export default function NewReport() {
       </div>
 
       <form onSubmit={handleInvia}>
+        {error && (
+          <div style={{ background: 'var(--b-red)', color: 'white', padding: '12px 16px', marginBottom: 16, border: '2px solid var(--b-black)', fontWeight: 800, fontSize: '0.85rem', textTransform: 'uppercase' }}>
+            Attenzione: {error}
+          </div>
+        )}
         <div className="flat-panel" style={{ marginBottom: 16 }}>
           <h3 style={{ textTransform: 'uppercase', marginBottom: 20, borderBottom: '2px solid var(--b-black)', paddingBottom: 12 }}>
             Dettagli della Segnalazione
           </h3>
 
-          <label>Titolo Riassuntivo</label>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
+            <label>Titolo Riassuntivo</label>
+            <span style={{ fontSize: '0.7rem', fontWeight: 700, color: 'var(--b-gray)' }}>{titolo.length}/80</span>
+          </div>
           <input
             placeholder="Es. Mancano sedie in laboratorio..."
             value={titolo}
             onChange={(e) => setTitolo(e.target.value)}
+            maxLength={80}
             required
             id="new-report-title"
           />
@@ -83,11 +107,15 @@ export default function NewReport() {
             placeholder="Seleziona una categoria"
           />
 
-          <label>Descrizione Completa</label>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
+            <label>Descrizione Completa</label>
+            <span style={{ fontSize: '0.7rem', fontWeight: 700, color: 'var(--b-gray)' }}>{problema.length}/1000</span>
+          </div>
           <textarea
             placeholder="Spiega bene di cosa si tratta, includendo tutti i dettagli utili..."
             value={problema}
             onChange={(e) => setProblema(e.target.value)}
+            maxLength={1000}
             style={{ minHeight: 160 }}
             required
             id="new-report-desc"

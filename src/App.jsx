@@ -9,6 +9,8 @@ import { useAuth } from './context/AuthContext';
 const Verify = lazy(() => import('./pages/Verify'));
 const AdminLogin = lazy(() => import('./pages/admin/AdminLogin'));
 
+import DemoSwitcher from './components/demo/DemoSwitcher';
+
 // Funzione helper per estrarre i componenti dal bundle unico
 const lazyFromBundle = (componentName) => {
   return lazy(() => import('./bundles/AppBundle').then(m => ({ default: m[componentName] })));
@@ -26,7 +28,6 @@ const PostDetail = lazyFromBundle('PostDetail');
 const NewReport = lazyFromBundle('NewReport');
 const MyReports = lazyFromBundle('MyReports');
 const StudentProfile = lazyFromBundle('StudentProfile');
-const DemoSwitcher = lazyFromBundle('DemoSwitcher');
 
 // Fallback Loader in stile Brutalista
 const BrutalistLoader = () => (
@@ -44,9 +45,15 @@ const BrutalistLoader = () => (
 
 // Riporta in cima alla pagina ad ogni cambio rotta (escluse ancore e scrollTo gestiti dalla Landing)
 function ScrollToTop() {
-  const { pathname, hash, state } = useLocation();
+  const { pathname, hash } = useLocation();
+  const state = useLocation().state;
   useEffect(() => {
     if (hash || state?.scrollTo) return;
+    
+    // Nelle rotte pubbliche (Landing e Chi Siamo), lo scroll in cima
+    // viene gestito in modo fluido da onExitComplete in PublicLayout.
+    if (pathname === '/' || pathname === '/chi-siamo') return;
+    
     window.scrollTo(0, 0);
   }, [pathname, hash, state]);
   return null;

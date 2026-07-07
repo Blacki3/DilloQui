@@ -13,7 +13,11 @@ export default function PublicLayout() {
   return (
     <>
       <Navbar />
-      <AnimatePresence mode="wait" initial={false}>
+      <AnimatePresence 
+        mode="wait" 
+        initial={false}
+        onExitComplete={() => window.scrollTo(0, 0)}
+      >
         <motion.div
           key={location.pathname}
           initial={shouldReduceMotion ? { opacity: 0 } : { opacity: 0, filter: 'blur(4px)', y: 8 }}
