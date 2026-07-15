@@ -6,7 +6,6 @@ import {
   normalizeSlug,
 } from './mockSettings';
 
-// Mock API
 export async function requestCode(email, slug) {
   return new Promise((resolve) => {
     setTimeout(() => {
@@ -26,7 +25,7 @@ export async function requestCode(email, slug) {
         resolve({ success: false, message: 'Email non autorizzata per questa Box.' });
       } else {
         // Simuliamo che tutte le email valide passino il check per questa fase mock
-        resolve({ success: true, message: `Codice inviato per lo sportello ${normalizedSlug.toUpperCase()} ✅` });
+        resolve({ success: true, message: `Codice inviato per lo sportello ${normalizedSlug.toUpperCase()}` });
       }
     }, 1500);
   });
@@ -49,10 +48,9 @@ export async function verifyCode(email, code, slug) {
   });
 }
 
-export async function sendData(data, sessionToken, slug) {
+export async function sendData(_data, _sessionToken, _slug) {
   return new Promise((resolve) => {
     setTimeout(() => {
-      console.log(`Dati inviati per lo sportello ${slug}:`, data);
       resolve({ success: true });
     }, 1500);
   });

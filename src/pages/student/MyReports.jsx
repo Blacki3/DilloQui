@@ -2,22 +2,22 @@ import { useState, useRef, useEffect } from 'react';
 import { Lock, Eye, CheckCircle2, X, Send, MessageSquare, ArrowLeft } from 'lucide-react';
 import { useReports, addMessage, setStatus, STATUS, STATUS_LABEL, STATUS_BADGE_CLASS } from '../../services/mockStore';
 
-const filterTabs = ['Tutti', 'In Lavorazione', 'Chiusi'];
+const filterTabs = ['Tutte', 'In Lavorazione', 'Chiuse'];
 
 export default function MyReports() {
   const reports = useReports()
     .filter((item) => item.mine)
     .sort((a, b) => b.createdAt - a.createdAt);
-  const [activeFilter, setActiveFilter] = useState('Tutti');
+  const [activeFilter, setActiveFilter] = useState('Tutte');
   const [openChat, setOpenChat] = useState(null);
   const [chatInput, setChatInput] = useState('');
   const [confirmClose, setConfirmClose] = useState(null);
   const chatEndRef = useRef(null);
 
   const filtered = reports.filter(r => {
-    if (activeFilter === 'Tutti') return true;
+    if (activeFilter === 'Tutte') return true;
     if (activeFilter === 'In Lavorazione') return r.status === STATUS.in_review || r.status === STATUS.new;
-    if (activeFilter === 'Chiusi') return r.status === STATUS.closed || r.status === STATUS.resolved;
+    if (activeFilter === 'Chiuse') return r.status === STATUS.closed || r.status === STATUS.resolved;
     return true;
   });
 

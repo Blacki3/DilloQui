@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { Link, Check, Plus, Trash2 } from 'lucide-react';
+import { Check, Plus, Trash2 } from 'lucide-react';
+import { motion } from 'framer-motion';
 import CopyLinkButton from '../../components/CopyLinkButton';
 import { getSettings, saveSettings, isValidEmail } from '../../services/mockSettings';
 
@@ -32,10 +33,13 @@ export default function Settings() {
   const [slug, setSlug] = useState(initial.slug);
   const [savingSlug, setSavingSlug] = useState(false);
   const [requireClass, setRequireClass] = useState(initial.requireClass);
+  const [emailFilterMode, setEmailFilterMode] = useState(initial.emailFilterMode || 'exact');
   const [categories, setCategories] = useState(
     initial.categories.map((name, idx) => ({ id: idx + 1, name })),
   );
   const [newCategory, setNewCategory] = useState('');
+  const [notifEmails, setNotifEmails] = useState(['preside@scuola.edu.it']);
+  const [newNotif, setNewNotif] = useState('');
   const [saveMsg, setSaveMsg] = useState('');
 
   const getEmailLines = () =>
@@ -46,10 +50,11 @@ export default function Settings() {
 
   const buildPayload = (overrides = {}) => {
     const categoryNames = categories.map((cat) => cat.name.trim()).filter(Boolean);
-    const validEmails = getEmailLines().filter((entry) => isValidEmail(entry));
+    const validEmails = getEmailLines();
     return {
       ...getSettings(),
       slug,
+      emailFilterMode,
       whitelist: validEmails,
       requireClass,
       categories: categoryNames,
@@ -62,6 +67,7 @@ export default function Settings() {
     setSlug(saved.slug);
     setSavedSlug(saved.slug);
     setEmails(saved.whitelist.join('\n'));
+    setEmailFilterMode(saved.emailFilterMode || 'exact');
     setCategories(saved.categories.map((name, idx) => ({ id: idx + 1, name })));
     return saved;
   };
@@ -94,15 +100,26 @@ export default function Settings() {
     persistSettings({
       categories: nextCategories.map((cat) => cat.name.trim()).filter(Boolean),
     });
-    setSaveMsg('Categorie aggiornate.');
+    setSaveMsg('Categoria rimossa.');
+  };
+
+  const handleAddNotif = () => {
+    if (newNotif.trim() && !notifEmails.includes(newNotif.trim())) {
+      setNotifEmails([...notifEmails, newNotif.trim()]);
+      setNewNotif('');
+      setSaveMsg('Email di notifica aggiunta.');
+    }
+  };
+
+  const handleRemoveNotif = (email) => {
+    setNotifEmails(notifEmails.filter(e => e !== email));
+    setSaveMsg('Email di notifica rimossa.');
   };
 
   const handleSaveWhitelist = () => {
-    const allEntries = getEmailLines();
-    const validEntries = allEntries.filter((entry) => isValidEmail(entry));
-    const discarded = allEntries.length - validEntries.length;
+    const validEntries = getEmailLines();
     persistSettings({ whitelist: validEntries });
-    setSaveMsg(discarded > 0 ? `Whitelist salvata (${discarded} voci non valide ignorate).` : 'Whitelist salvata.');
+    setSaveMsg('Whitelist salvata.');
   };
 
   const handleToggleRequireClass = () => {
@@ -119,7 +136,14 @@ export default function Settings() {
   );
 
   return (
-    <div className="admin-page admin-page-wide" style={{ paddingBottom: 60 }}>
+    <motion.div
+      className="admin-page admin-page-wide"
+      style={{ paddingBottom: 60 }}
+      initial={{ opacity: 0, y: 15 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, y: -15 }}
+      transition={{ duration: 0.3 }}
+    >
       {/* Header */}
       <div style={{ marginBottom: 28 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
@@ -145,16 +169,8 @@ export default function Settings() {
         </div>
 
         <label>Indirizzo Web</label>
-        <div style={{
-          display: 'flex', alignItems: 'stretch', border: 'var(--b-border)',
-          boxShadow: 'var(--b-shadow-sm)', marginBottom: 8, overflow: 'hidden',
-        }}>
-          <div style={{
-            color: 'var(--b-gray)', background: 'var(--b-cream)', borderRight: '2px solid var(--b-black)',
-            fontWeight: 700, userSelect: 'none', fontSize: '0.88rem',
-            display: 'flex', alignItems: 'center', padding: '12px 14px',
-            fontFamily: "'IBM Plex Mono', monospace",
-          }}>
+        <div className="settings-url-bar">
+          <div className="settings-url-prefix">
             dilloqui.app/box/
           </div>
           <input
@@ -192,6 +208,7 @@ export default function Settings() {
             <button
               onClick={handleSaveSlug}
               disabled={savingSlug}
+              className="settings-url-btn"
               style={{
                 padding: '0 18px',
                 background: 'var(--b-yellow)',
@@ -272,18 +289,53 @@ export default function Settings() {
       </div>
 
       {/* Whitelist */}
-      <SectionTitle>Whitelist Email Studenti</SectionTitle>
+      <SectionTitle>Filtro Accessi (Email / Dominio)</SectionTitle>
       <div className="flat-panel">
         <p style={{ color: 'var(--b-gray)', marginBottom: 14, fontSize: '0.9rem' }}>
-          Inserisci le email scolastiche autorizzate (una per riga). Solo queste email potranno ricevere il codice OTP.
+          Configura le regole di accesso per gli studenti della tua scuola.
         </p>
-        <label>Email Autorizzate</label>
-        <textarea
-          value={emails}
-          onChange={(e) => setEmails(e.target.value)}
-          style={{ minHeight: 160, fontFamily: "'IBM Plex Mono', monospace", fontSize: '0.875rem' }}
-          id="settings-whitelist-textarea"
-        />
+
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px', border: '2px solid var(--b-black)', background: 'var(--b-cream)', marginBottom: 16 }}>
+          <div>
+            <div style={{ fontWeight: 800, fontSize: '0.9rem', textTransform: 'uppercase', marginBottom: 4 }}>Controllo tramite Dominio</div>
+            <div style={{ fontSize: '0.82rem', color: 'var(--b-gray)' }}>Se attivo, basterà inserire es. <strong>@scuola.edu.it</strong> per ammettere tutti gli alunni. Altrimenti è richiesta l'email esatta.</div>
+          </div>
+          <BrutToggle
+            on={emailFilterMode === 'domain'}
+            onClick={() => {
+              const nextMode = emailFilterMode === 'domain' ? 'exact' : 'domain';
+              setEmailFilterMode(nextMode);
+              persistSettings({ emailFilterMode: nextMode });
+              setSaveMsg(`Modalità filtro aggiornata a ${nextMode === 'domain' ? 'Dominio' : 'Email Esatta'}.`);
+            }}
+          />
+        </div>
+
+        <label>Lista Autorizzati ({emailFilterMode === 'domain' ? 'Dominio Autorizzato' : 'Email Esatte'})</label>
+
+        {emailFilterMode === 'domain' ? (
+          <div style={{ display: 'flex', border: '2px solid var(--b-black)', background: 'var(--b-white)', marginBottom: 16 }}>
+            <div style={{ padding: '12px 14px', background: 'var(--b-cream)', borderRight: '2px solid var(--b-black)', color: 'var(--b-gray)', fontWeight: 800, fontFamily: "'IBM Plex Mono', monospace" }}>
+              *@
+            </div>
+            <input
+              type="text"
+              placeholder="istituto.edu.it"
+              value={emails.replace(/[@]/g, '')}
+              onChange={(e) => setEmails('@' + e.target.value.replace(/[@]/g, ''))}
+              style={{ border: 'none', background: 'transparent', padding: '12px 14px', flex: 1, outline: 'none', fontWeight: 700, fontFamily: "'IBM Plex Mono', monospace" }}
+              id="settings-whitelist-domain"
+            />
+          </div>
+        ) : (
+          <textarea
+            value={emails}
+            onChange={(e) => setEmails(e.target.value)}
+            style={{ minHeight: 160, fontFamily: "'IBM Plex Mono', monospace", fontSize: '0.875rem', marginBottom: 16 }}
+            id="settings-whitelist-textarea"
+            placeholder="mario.rossi@scuola.it&#10;giulia.bianchi@scuola.it"
+          />
+        )}
         <button className="btn-primary" style={{ marginTop: 4 }} id="settings-whitelist-save" onClick={handleSaveWhitelist}>
           <Check size={16} strokeWidth={3} /> Salva Whitelist
         </button>
@@ -296,11 +348,19 @@ export default function Settings() {
       <SectionTitle>Notifiche Email Referenti</SectionTitle>
       <div className="flat-panel">
         <p style={{ color: 'var(--b-gray)', marginBottom: 14, fontSize: '0.9rem' }}>
-          Email dei docenti che riceveranno un avviso ad ogni nuova segnalazione.
+          Email di coloro che riceveranno un avviso ad ogni nuova segnalazione.
         </p>
         <div style={{ display: 'flex', gap: 8, marginBottom: 14 }}>
-          <input placeholder="email.docente@scuola.edu.it" style={{ margin: 0, flex: 1 }} id="settings-notif-email" />
+          <input
+            placeholder="email.docente@scuola.edu.it"
+            style={{ margin: 0, flex: 1 }}
+            id="settings-notif-email"
+            value={newNotif}
+            onChange={e => setNewNotif(e.target.value)}
+            onKeyDown={e => e.key === 'Enter' && handleAddNotif()}
+          />
           <button
+            onClick={handleAddNotif}
             style={{
               padding: '0 20px', background: 'var(--b-blue)', color: '#FFFFFF',
               border: 'var(--b-border)', boxShadow: 'var(--b-shadow-sm)', cursor: 'pointer',
@@ -315,17 +375,27 @@ export default function Settings() {
             Aggiungi +
           </button>
         </div>
-        <div style={{ border: '2px solid var(--b-black)', padding: '12px 16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'var(--b-cream)' }}>
-          <span style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: '0.875rem', fontWeight: 600 }}>preside@scuola.edu.it</span>
-          <button style={{ color: 'var(--b-gray)', background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center' }}
-            aria-label="Rimuovi email docente"
-            onMouseOver={e => e.currentTarget.style.color = 'var(--b-red)'}
-            onMouseOut={e => e.currentTarget.style.color = 'var(--b-gray)'}
-            id="settings-remove-notif"
-          >
-            <Trash2 size={16} strokeWidth={2.5} />
-          </button>
-        </div>
+
+        {notifEmails.length === 0 ? (
+          <div style={{ fontSize: '0.85rem', color: 'var(--b-gray)', fontStyle: 'italic', padding: '8px 0' }}>Nessuna email impostata.</div>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {notifEmails.map((email, idx) => (
+              <div key={idx} style={{ border: '2px solid var(--b-black)', padding: '12px 16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'var(--b-cream)' }}>
+                <span style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: '0.875rem', fontWeight: 600 }}>{email}</span>
+                <button
+                  onClick={() => handleRemoveNotif(email)}
+                  style={{ color: 'var(--b-gray)', background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center' }}
+                  aria-label={`Rimuovi ${email}`}
+                  onMouseOver={e => e.currentTarget.style.color = 'var(--b-red)'}
+                  onMouseOut={e => e.currentTarget.style.color = 'var(--b-gray)'}
+                >
+                  <Trash2 size={16} strokeWidth={2.5} />
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Dati Studenti */}
@@ -348,6 +418,6 @@ export default function Settings() {
           ✓ {saveMsg}
         </div>
       )}
-    </div>
+    </motion.div>
   );
 }

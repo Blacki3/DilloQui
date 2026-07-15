@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { ShieldAlert, Users, ArrowLeftRight, Check, ChevronDown, Home } from 'lucide-react';
+import { seedDemoDrafts } from '../../services/draftStore';
 
 /* ── Icona DEMO (Target + cursore) ── */
 const DemoIconSvg = ({ size = 24, className = "", style = {} }) => (
@@ -47,8 +48,12 @@ export default function DemoSwitcher() {
   const isAdminViewActive = location.pathname.startsWith('/demo/admin');
 
   const switchToStudent = () => {
-    if (!studentToken) loginStudent('mock-session-demo');
-    navigate('/box/demo/forum');
+    if (!studentToken) {
+      navigate('/box/demo');
+    } else {
+      seedDemoDrafts();
+      navigate('/box/demo/forum');
+    }
   };
   const switchToAdmin = () => {
     if (!adminToken) loginAdmin('mock-admin-token');
@@ -57,6 +62,8 @@ export default function DemoSwitcher() {
   const handleResetDemo = () => {
     logoutStudent();
     logoutAdmin();
+    localStorage.removeItem('dq_verify_step_demo');
+    localStorage.removeItem('dq_verify_email_demo');
     navigate('/');
   };
 

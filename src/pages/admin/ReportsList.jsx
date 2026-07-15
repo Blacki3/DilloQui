@@ -3,6 +3,7 @@ import {
   Search, SlidersHorizontal, MessageSquare, ArrowLeft, Send, CheckCircle2, X, RotateCcw,
   Inbox, FilterX, ArrowDownUp, Globe, Lock, Users, ChevronLeft, ThumbsUp,
 } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { getSettings } from '../../services/mockSettings';
 import {
   useReports,
@@ -599,9 +600,16 @@ export default function ReportsList() {
 
   if (openChat && openReport && !isWide) {
     return (
-      <div className="admin-page reports-page" style={{ maxWidth: 720, margin: '0 auto', paddingBottom: 80 }}>
+      <motion.div 
+        className="admin-page reports-page" 
+        style={{ maxWidth: 720, margin: '0 auto', paddingBottom: 80 }}
+        initial={{ opacity: 0, y: 15 }}
+        animate={{ opacity: 1, y: 0 }}
+        exit={{ opacity: 0, y: -15 }}
+        transition={{ duration: 0.3 }}
+      >
         <ReportDetailView {...detailProps} />
-      </div>
+      </motion.div>
     );
   }
 
@@ -648,7 +656,13 @@ export default function ReportsList() {
   );
 
   return (
-    <div className="admin-page reports-page">
+    <motion.div 
+      className="admin-page reports-page"
+      initial={{ opacity: 0, y: 15 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, y: -15 }}
+      transition={{ duration: 0.3 }}
+    >
       <div className={gridClassName}>
         <header className="reports-page-title-row">
           <div className="reports-page-title-group">
@@ -677,9 +691,19 @@ export default function ReportsList() {
 
         <div className={`reports-list-column${openReport && isWide ? ' reports-list-column--with-detail' : ''}`}>
 
-      {!isDesktopFilters && showFilters && (
-        <ReportsFiltersPanel id="reports-filter-panel" {...filterPanelProps} showSort={false} />
-      )}
+      <AnimatePresence>
+        {!isDesktopFilters && showFilters && (
+          <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: 'auto' }}
+            exit={{ opacity: 0, height: 0 }}
+            transition={{ duration: 0.2 }}
+            style={{ overflow: 'hidden' }}
+          >
+            <ReportsFiltersPanel id="reports-filter-panel" {...filterPanelProps} showSort={false} />
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       <div className={`reports-toolbar${isDesktopFilters ? ' reports-toolbar--no-sort' : ''}`}>
         <div className="reports-search-bar">
@@ -818,34 +842,50 @@ export default function ReportsList() {
       </div>
         </div>
 
-        {openReport && isWide && detailProps && (
-          <div className="reports-detail-column">
-            <ReportDetailView {...detailProps} />
-          </div>
-        )}
+        <AnimatePresence mode="popLayout">
+          {openReport && isWide && detailProps && (
+            <motion.div 
+              className="reports-detail-column"
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: 20 }}
+              transition={{ duration: 0.2 }}
+            >
+              <ReportDetailView {...detailProps} />
+            </motion.div>
+          )}
+        </AnimatePresence>
 
-        {isDesktopFilters && showDesktopFilters && (
-          <aside className="reports-filters-sidebar" aria-label="Filtri e ordinamento" id="reports-filter-sidebar">
-            <div className="reports-filters-sidebar-header">
-              <button
-                type="button"
-                className="reports-filters-collapse-btn"
-                onClick={() => setShowDesktopFilters(false)}
-                aria-expanded={true}
-                aria-controls="reports-filter-sidebar"
-                aria-label="Chiudi pannello filtri"
-                id="reports-filter-collapse-btn"
-              >
-                <ChevronLeft size={16} strokeWidth={3} aria-hidden="true" />
-              </button>
-              <h2 className="reports-filters-sidebar-heading">
-                <SlidersHorizontal size={16} strokeWidth={2.5} aria-hidden="true" />
-                Filtri
-              </h2>
-            </div>
-            <ReportsFiltersPanel id="reports-filter-sidebar-panel" className="scrollbar-hidden" {...filterPanelProps} />
-          </aside>
-        )}
+        <AnimatePresence>
+          {isDesktopFilters && showDesktopFilters && (
+            <motion.aside 
+              className="reports-filters-sidebar" aria-label="Filtri e ordinamento" id="reports-filter-sidebar"
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: 20 }}
+              transition={{ duration: 0.2 }}
+            >
+              <div className="reports-filters-sidebar-header">
+                <button
+                  type="button"
+                  className="reports-filters-collapse-btn"
+                  onClick={() => setShowDesktopFilters(false)}
+                  aria-expanded={true}
+                  aria-controls="reports-filter-sidebar"
+                  aria-label="Chiudi pannello filtri"
+                  id="reports-filter-collapse-btn"
+                >
+                  <ChevronLeft size={16} strokeWidth={3} aria-hidden="true" />
+                </button>
+                <h2 className="reports-filters-sidebar-heading">
+                  <SlidersHorizontal size={16} strokeWidth={2.5} aria-hidden="true" />
+                  Filtri
+                </h2>
+              </div>
+              <ReportsFiltersPanel id="reports-filter-sidebar-panel" className="scrollbar-hidden" {...filterPanelProps} />
+            </motion.aside>
+          )}
+        </AnimatePresence>
 
         {isDesktopFilters && !showDesktopFilters && (
           <button
@@ -862,6 +902,6 @@ export default function ReportsList() {
           </button>
         )}
       </div>
-    </div>
+    </motion.div>
   );
 }

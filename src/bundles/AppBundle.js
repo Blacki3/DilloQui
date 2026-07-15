@@ -3,6 +3,7 @@ export { default as Dashboard } from '../pages/admin/Dashboard';
 export { default as ReportsList } from '../pages/admin/ReportsList';
 export { default as Settings } from '../pages/admin/Settings';
 export { default as AdminProfile } from '../pages/admin/AdminProfile';
+export { default as UsersList } from '../pages/admin/UsersList';
 
 export { default as StudentLayout } from '../layouts/StudentLayout';
 export { default as Forum } from '../pages/student/Forum';
@@ -10,3 +11,5 @@ export { default as PostDetail } from '../pages/student/PostDetail';
 export { default as NewReport } from '../pages/student/NewReport';
 export { default as MyReports } from '../pages/student/MyReports';
 export { default as StudentProfile } from '../pages/student/StudentProfile';
+export { default as Drafts } from '../pages/student/Drafts';
+export { default as Tendenze } from '../pages/student/Tendenze';

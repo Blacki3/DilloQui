@@ -67,11 +67,17 @@
   }
 }
 
+@keyframes wave-shift {
+  0% { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
+
 /* ======================== RESET ======================== */
 * {
   box-sizing: border-box;
   margin: 0;
   padding: 0;
+  -webkit-tap-highlight-color: transparent;
 }
 
 body {
@@ -96,6 +102,71 @@ h6 {
   letter-spacing: 0.01em;
   line-height: 1.15;
   margin-top: 0;
+}
+
+/* ======================== FORUM TOOLBAR ======================== */
+.forum-toolbar {
+  display: flex;
+  border: 2px solid var(--b-black);
+  background: var(--b-white);
+  box-shadow: var(--b-shadow-sm);
+  margin-bottom: 24px;
+  align-items: stretch;
+}
+.forum-toolbar-search {
+  flex: 1;
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+.forum-toolbar-search input {
+  width: 100%;
+  border: none;
+  background: transparent;
+  padding: 12px 12px 12px 38px;
+  margin: 0;
+  box-shadow: none;
+  border-radius: 0;
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 0.85rem;
+  font-weight: 700;
+  outline: none;
+  color: var(--b-black);
+}
+.forum-toolbar-search input::placeholder {
+  color: var(--b-gray);
+  font-weight: 600;
+}
+.forum-toolbar-action {
+  border-left: 2px solid var(--b-black);
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.custom-dropdown-label {
+  font-size: 0.8rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+@media (max-width: 600px) {
+  .forum-toolbar-action {
+    width: 48px;
+  }
+  .custom-dropdown-label {
+    display: none;
+  }
+}
+
+.post-submit-btn {
+  padding: 0 18px;
+}
+@media (max-width: 600px) {
+  .post-submit-btn {
+    padding: 0 6px;
+  }
 }
 
 h1 {
@@ -198,6 +269,23 @@ textarea:focus,
 select:focus {
   box-shadow: 5px 5px 0 var(--b-yellow);
   border-color: var(--b-black);
+}
+
+/* Reset for checkboxes and radios */
+input[type="checkbox"],
+input[type="radio"] {
+  width: auto;
+  margin: 0;
+  padding: 0;
+  border: none;
+  box-shadow: none !important;
+}
+input[type="checkbox"]:focus,
+input[type="checkbox"]:focus-visible,
+input[type="radio"]:focus,
+input[type="radio"]:focus-visible {
+  box-shadow: none !important;
+  outline: none !important;
 }
 
 textarea {
@@ -517,9 +605,10 @@ textarea:focus-visible {
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 24px 16px;
+  padding: 32px 16px;
   background: var(--b-cream);
   position: relative;
+  overflow: hidden;
 }
 
 /* Decorative grid pattern */
@@ -530,21 +619,47 @@ textarea:focus-visible {
   background-image:
     linear-gradient(var(--b-gray-l) 1px, transparent 1px),
     linear-gradient(90deg, var(--b-gray-l) 1px, transparent 1px);
-  background-size: 40px 40px;
+  background-size: 32px 32px;
+  opacity: 0.3;
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* Decorative accent block */
+.app-container::after {
+  content: '';
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 280px;
+  height: 280px;
+  background: var(--b-yellow);
+  border-bottom-right-radius: 0;
+  border: 3px solid var(--b-black);
+  border-top: none;
+  border-left: none;
   opacity: 0.35;
   pointer-events: none;
   z-index: 0;
+  clip-path: polygon(0 0, 100% 0, 0 100%);
+}
+
+/* Auth wordmark above card */
+.auth-wordmark {
+  text-align: center;
+  margin-bottom: 20px;
+  position: relative;
+  z-index: 1;
 }
 
 .verify-card {
   background: var(--b-white);
   border: var(--b-border);
   box-shadow: var(--b-shadow-lg);
-  padding: 40px 32px;
+  padding: 44px 36px;
   width: 100%;
-  max-width: 420px;
+  max-width: 440px;
   text-align: center;
-  border-radius: var(--b-radius);
   position: relative;
   z-index: 1;
 }
@@ -557,19 +672,20 @@ textarea:focus-visible {
 }
 
 .verify-card h2 {
-  font-size: 1.8rem;
-  font-weight: 800;
+  font-size: 1.7rem;
+  font-weight: 900;
   color: var(--b-black);
   margin-bottom: 4px;
   text-transform: uppercase;
-  letter-spacing: 0.02em;
+  letter-spacing: 0.03em;
 }
 
 .verify-slug {
-  font-size: 0.9rem;
+  font-size: 0.88rem;
   color: var(--b-gray);
   margin-bottom: 24px;
   font-weight: 500;
+  line-height: 1.5;
 }
 
 /* Pill slug */
@@ -585,6 +701,73 @@ textarea:focus-visible {
   font-weight: 700;
   font-family: 'IBM Plex Mono', monospace;
   box-shadow: var(--b-shadow-sm);
+}
+
+/* Step indicator */
+.auth-steps {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0;
+  margin-bottom: 28px;
+}
+
+.auth-step {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+  position: relative;
+  flex: 1;
+}
+
+.auth-step-circle {
+  width: 32px;
+  height: 32px;
+  border: 3px solid var(--b-black);
+  background: var(--b-white);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.75rem;
+  font-weight: 900;
+  font-family: 'IBM Plex Mono', monospace;
+  transition: background 0.2s, color 0.2s;
+  position: relative;
+  z-index: 1;
+}
+
+.auth-step.active .auth-step-circle,
+.auth-step.done .auth-step-circle {
+  background: var(--b-yellow);
+  color: var(--b-black);
+}
+
+.auth-step-label {
+  font-size: 0.65rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--b-gray);
+}
+
+.auth-step.active .auth-step-label,
+.auth-step.done .auth-step-label {
+  color: var(--b-black);
+}
+
+.auth-step-line {
+  flex: 1;
+  height: 3px;
+  background: var(--b-gray-l);
+  margin-bottom: 18px;
+  transition: background 0.2s;
+  position: relative;
+  top: -9px;
+}
+
+.auth-step-line.done {
+  background: var(--b-black);
 }
 
 /* Input email con icona */
@@ -620,7 +803,7 @@ textarea:focus-visible {
   border: none;
   background: transparent;
   margin: 0;
-  padding: 13px 0;
+  padding: 14px 0;
   font-size: 0.95rem;
   flex: 1;
   min-width: 0;
@@ -642,23 +825,60 @@ textarea:focus-visible {
 }
 
 .otp-inputs input {
-  width: 48px;
-  height: 56px;
+  width: 52px;
+  height: 60px;
   text-align: center;
-  font-size: 1.5rem;
+  font-size: 1.6rem;
   font-weight: 800;
   font-family: 'IBM Plex Mono', monospace;
-  border: var(--b-border);
+  border: 3px solid var(--b-black);
   background: var(--b-white);
   padding: 0;
   margin: 0;
   box-shadow: var(--b-shadow-sm);
-  transition: box-shadow 0.1s;
+  transition: box-shadow 0.1s, background 0.15s;
+}
+
+.otp-inputs input:not(:placeholder-shown) {
+  background: var(--b-yellow);
 }
 
 .otp-inputs input:focus {
   box-shadow: 4px 4px 0 var(--b-yellow);
   outline: none;
+}
+
+/* Admin login tab bar */
+.auth-tab-bar {
+  display: flex;
+  border: var(--b-border);
+  margin-bottom: 28px;
+  box-shadow: var(--b-shadow-sm);
+  overflow: hidden;
+}
+
+.auth-tab {
+  flex: 1;
+  padding: 11px 0;
+  border: none;
+  background: var(--b-white);
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 0.8rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  cursor: pointer;
+  transition: background 0.15s;
+  color: var(--b-gray);
+}
+
+.auth-tab:first-child {
+  border-right: var(--b-border);
+}
+
+.auth-tab.active {
+  background: var(--b-yellow);
+  color: var(--b-black);
 }
 
 .verify-footer {
@@ -674,6 +894,63 @@ textarea:focus-visible {
   font-weight: 800;
   text-decoration: underline;
   text-underline-offset: 3px;
+}
+
+/* ======================== NEW REPORT TWO-COLUMN ======================== */
+.new-report-grid {
+  display: block;
+  width: 100%;
+}
+
+.new-report-col-left,
+.new-report-col-right {
+  width: 100%;
+}
+
+@media (min-width: 900px) {
+  .new-report-grid {
+    display: grid;
+    grid-template-columns: 3fr 1fr;
+    grid-template-rows: auto 1fr;
+    column-gap: 24px;
+    row-gap: 16px;
+    align-items: stretch;
+  }
+
+  .new-report-header {
+    grid-column: 1 / -1;
+  }
+
+  .new-report-col-left {
+    grid-column: 1;
+  }
+
+  .new-report-col-right {
+    grid-column: 2;
+    position: sticky;
+    top: 24px;
+    align-self: start;
+  }
+
+  .new-report-col-left .flat-panel {
+    height: 100%;
+  }
+
+  .new-report-col-right .flat-panel {
+    min-height: 100%;
+  }
+}
+
+/* Card opzioni più compatte nella colonna destra della nuova segnalazione */
+.new-report-col-right .option-row {
+  padding: 8px 12px;
+  gap: 10px;
+  font-size: 0.82rem;
+}
+
+.new-report-col-right .option-row-sub {
+  font-size: 0.72rem;
+  margin-top: 1px;
 }
 
 /* ======================== STUDENT LAYOUT ======================== */
@@ -694,7 +971,7 @@ textarea:focus-visible {
 }
 
 .student-nav-inner {
-  max-width: 720px;
+  max-width: 100%;
   margin: 0 auto;
   display: flex;
   justify-content: space-between;
@@ -745,6 +1022,7 @@ textarea:focus-visible {
   border-top: var(--b-border);
   padding: 8px 0 max(8px, env(safe-area-inset-bottom));
   z-index: 100;
+  overflow: visible; /* necessario per lo speed dial */
 }
 
 .student-tab-bar-inner {
@@ -752,6 +1030,120 @@ textarea:focus-visible {
   justify-content: space-evenly;
   align-items: center;
   width: 100%;
+  overflow: visible;
+}
+
+/* ======================== SPEED DIAL (Mickey ears) ======================== */
+.speed-dial-wrapper {
+  position: relative;
+  flex: 1;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  overflow: visible; /* necessario per le orecchie posizionate fuori dal wrapper */
+}
+
+.speed-dial-ears {
+  position: absolute;
+  bottom: calc(100% + 24px); /* Alzato per evitare compenetrazione con la navbar */
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 28px;
+  align-items: flex-end;
+  pointer-events: none; /* il click passa ai singoli orb */
+  z-index: 200; /* sopra il backdrop (150) e il tab bar (100) */
+}
+
+.speed-dial-ear {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+  pointer-events: all;
+}
+
+/* Il cerchio rotante */
+.speed-dial-orb {
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  border: var(--b-border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: var(--b-shadow);
+  transition:
+    transform 0.42s cubic-bezier(0.34, 1.56, 0.64, 1),
+    opacity 0.22s ease;
+  transform-origin: center center;
+}
+
+.speed-dial-orb.closed {
+  transform: scale(0) rotate(-180deg);
+  opacity: 0;
+  pointer-events: none;
+}
+
+.speed-dial-orb.open {
+  transform: scale(1) rotate(0deg);
+  opacity: 1;
+}
+
+/* Label sotto il cerchio */
+.speed-dial-orb-label {
+  font-size: 0.65rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--b-black);
+  background: var(--b-white);
+  border: 2px solid var(--b-black);
+  padding: 4px 8px;
+  box-shadow: 2px 2px 0 var(--b-black);
+  font-family: 'Space Grotesk', sans-serif;
+  white-space: nowrap;
+  transition: opacity 0.2s ease 0.1s;
+}
+
+.speed-dial-orb-label.closed {
+  opacity: 0;
+}
+
+.speed-dial-orb-label.open {
+  opacity: 1;
+}
+
+/* Backdrop semi-trasparente quando il menu è aperto */
+.speed-dial-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 99;
+  background: transparent;
+}
+
+/* Icona + che ruota per diventare × */
+.tab-new-icon {
+  transition: transform 0.38s cubic-bezier(0.34, 1.56, 0.64, 1);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.tab-new-icon.open {
+  transform: rotate(45deg);
+}
+
+/* Utilità per nascondere elementi su mobile */
+.hide-on-mobile {
+  display: flex; /* o altro, ma solitamente questo basta come classe aggiuntiva se abbinata a stili inline, altrimenti meglio solo media query */
+}
+
+@media (max-width: 768px) {
+  .hide-on-mobile {
+    display: none !important;
+  }
 }
 
 .tab-item {
@@ -792,12 +1184,17 @@ textarea:focus-visible {
   border: 2px solid var(--b-black);
 }
 
+.tab-item.tab-new {
+  transform: translateY(-8px);
+}
+
 .tab-item.tab-new .tab-icon-wrap {
   background: var(--b-yellow);
   border: 2px solid var(--b-black);
-  box-shadow: var(--b-shadow-sm);
-  width: 44px;
-  height: 44px;
+  box-shadow: var(--b-shadow);
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
 }
 
 .tab-item.tab-new.active .tab-icon-wrap {
@@ -810,6 +1207,11 @@ textarea:focus-visible {
   margin: 0 auto;
   width: 100%;
   padding: 24px 16px;
+}
+
+/* Variante wide — usata da NewReport per il layout a due colonne */
+.student-main-content--wide {
+  max-width: 1100px;
 }
 
 /* Profile avatar button */
@@ -1665,7 +2067,8 @@ textarea:focus-visible {
 }
 
 .chat-input-bar input:focus {
-  box-shadow: none;
+  outline: none;
+  box-shadow: 4px 4px 0 var(--b-yellow) !important;
 }
 
 .chat-send-btn {
@@ -2614,6 +3017,7 @@ textarea:focus-visible {
   /* Admin mobile */
   .admin-container {
     flex-direction: column;
+    padding-left: 0 !important;
   }
 
   .admin-sidebar-toggle {
@@ -2645,15 +3049,16 @@ textarea:focus-visible {
     z-index: 998;
     box-shadow: var(--b-shadow-lg);
     overflow: visible !important;
-    transform: translateY(-110%);
+    transform: none;
+    clip-path: inset(0 0 100% 0);
     opacity: 0;
-    transition: transform 0.2s, opacity 0.15s;
+    transition: clip-path 0.35s cubic-bezier(0.2, 0.8, 0.2, 1), opacity 0.3s ease-out;
     height: auto;
     padding: 0;
   }
 
   .admin-sidebar.open {
-    transform: translateY(0);
+    clip-path: inset(0 0 -500px 0);
     opacity: 1;
   }
 
@@ -2674,6 +3079,35 @@ textarea:focus-visible {
     border-top: var(--b-border);
   }
 
+  .admin-profile-popup {
+    top: 100%;
+    bottom: auto;
+    margin-top: 8px;
+    margin-bottom: 0;
+    width: 200px;
+    left: 20px;
+    right: auto;
+    margin-left: 0;
+    margin-right: 0;
+  }
+
+  /* Settings responsive */
+  .settings-url-bar {
+    flex-wrap: wrap;
+  }
+  .settings-url-prefix {
+    width: 100%;
+    border-right: none !important;
+    border-bottom: 2px solid var(--b-black);
+  }
+  .settings-url-btn {
+    width: 100%;
+    border-left: none !important;
+    border-top: 2px solid var(--b-black);
+    padding: 12px !important;
+    justify-content: center;
+  }
+
   /* Student mobile */
   .desktop-nav {
     display: none !important;
@@ -2690,6 +3124,14 @@ textarea:focus-visible {
   /* Public */
   .public-navbar-links {
     gap: 4px;
+  }
+
+  .lnav-desktop {
+    display: none !important;
+  }
+
+  .lnav-mobile-btn {
+    display: flex !important;
   }
 
   .public-navbar-inner {
@@ -3640,4 +4082,88 @@ textarea:focus-visible {
   .reports-list-column--with-detail .reports-toolbar {
     margin-bottom: 12px;
   }
+}
+
+/* ======================== TOUCH DEVICE HOVER FIX ========================
+   Su mobile/tablet (touchscreen) il browser applica :hover al tocco e lo
+   "blocca" finché non si tocca altrove. Questo blocco elimina tutti gli
+   effetti hover sugli elementi interattivi per dispositivi touch.
+   @media (hover: none) = vera assenza di puntatore, solo touch.
+   ======================================================================= */
+@media (hover: none) {
+  /* Card Forum */
+  .forum-post-card:hover {
+    box-shadow: var(--b-shadow) !important;
+    transform: none !important;
+  }
+  .forum-post-card:hover .read-more-icon {
+    transform: none !important;
+  }
+
+  /* Card generiche (brut-card) */
+  .brut-card:hover {
+    transform: none !important;
+    box-shadow: var(--b-shadow) !important;
+  }
+
+  /* Card admin */
+  .admin-report-card:hover,
+  .admin-report-card--read:hover {
+    transform: none !important;
+    box-shadow: var(--b-shadow) !important;
+  }
+
+  /* Card landing */
+  .landing-feature-card:hover,
+  .landing-step:hover {
+    transform: none !important;
+    box-shadow: var(--b-shadow) !important;
+  }
+
+  /* Bottoni — lascia il colore di base, rimuove solo le trasformazioni */
+  .btn-primary:hover,
+  .btn-secondary:hover,
+  .btn-orange:hover,
+  .btn-blue:hover,
+  .btn-danger:hover,
+  .btn-icon:hover,
+  .dash-btn:hover,
+  .chat-send-btn:hover,
+  .popup-close-btn:hover,
+  .landing-btn-primary:hover,
+  .landing-btn-ghost:hover,
+  .landing-final-btn:hover {
+    transform: none !important;
+    box-shadow: var(--b-shadow) !important;
+  }
+
+  /* Profilo avatar e menu */
+  .profile-avatar-btn:hover {
+    transform: none !important;
+  }
+}
+
+/* =========================================
+   SETTINGS RESPONSIVE
+========================================= */
+.settings-url-bar {
+  display: flex;
+  align-items: stretch;
+  border: var(--b-border);
+  box-shadow: var(--b-shadow-sm);
+  margin-bottom: 8px;
+  overflow: hidden;
+}
+
+.settings-url-prefix {
+  color: var(--b-gray);
+  background: var(--b-cream);
+  border-right: 2px solid var(--b-black);
+  font-weight: 700;
+  user-select: none;
+  font-size: 0.88rem;
+  display: flex;
+  align-items: center;
+  padding: 12px 14px;
+  font-family: 'IBM Plex Mono', monospace;
 }

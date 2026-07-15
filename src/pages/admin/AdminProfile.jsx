@@ -6,6 +6,7 @@ import {
   Bell, Shield, Download, Lock, HelpCircle,
   ChevronRight, BadgeCheck, LogOut, User, ArrowLeft
 } from 'lucide-react';
+import { motion } from 'framer-motion';
 
 function BrutRow({ icon: Icon, label, sublabel, right, onClick }) {
   return (
@@ -78,7 +79,14 @@ export default function AdminProfile({ email = 'admin@scuola.edu.it' }) {
 
   if (isEditingProfile) {
     return (
-      <div className="admin-page admin-page-narrow" style={{ paddingBottom: 60 }}>
+      <motion.div 
+        className="admin-page admin-page-narrow" 
+        style={{ paddingBottom: 60 }}
+        initial={{ opacity: 0, y: 15 }}
+        animate={{ opacity: 1, y: 0 }}
+        exit={{ opacity: 0, y: -15 }}
+        transition={{ duration: 0.3 }}
+      >
         <button
           onClick={() => setIsEditingProfile(false)}
           style={{
@@ -113,37 +121,44 @@ export default function AdminProfile({ email = 'admin@scuola.edu.it' }) {
             Salva Modifiche ✓
           </button>
         </div>
-      </div>
+      </motion.div>
     );
   }
 
   return (
-    <div className="admin-page admin-page-narrow" style={{ paddingBottom: 60 }}>
+    <motion.div 
+      className="admin-page admin-page-narrow" 
+      style={{ paddingBottom: 60 }}
+      initial={{ opacity: 0, y: 15 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, y: -15 }}
+      transition={{ duration: 0.3 }}
+    >
       {/* Avatar Card */}
       <div style={{
-        background: 'var(--b-black)', border: '3px solid var(--b-black)',
+        background: 'var(--b-white)', border: '3px solid var(--b-black)',
         boxShadow: 'var(--b-shadow-lg)', padding: '28px 24px',
         display: 'flex', flexDirection: 'column', alignItems: 'center',
         textAlign: 'center', marginBottom: 20,
       }}>
         <div style={{
           width: 72, height: 72, background: 'var(--b-blue)',
-          border: '3px solid var(--b-yellow)',
+          border: '3px solid var(--b-black)',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
           fontWeight: 800, fontSize: '1.5rem', color: '#FFFFFF',
           fontFamily: "'IBM Plex Mono', monospace",
-          marginBottom: 14, boxShadow: '4px 4px 0 var(--b-yellow)',
+          marginBottom: 14, boxShadow: '4px 4px 0 var(--b-black)',
         }}>
           {initials}
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
-          <BadgeCheck size={14} color="var(--b-yellow)" strokeWidth={2.5} />
-          <span style={{ color: 'var(--b-yellow)', fontWeight: 800, fontSize: '0.78rem', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Admin Verificato</span>
+          <BadgeCheck size={15} color="var(--b-blue)" strokeWidth={2.5} />
+          <span style={{ color: 'var(--b-blue)', fontWeight: 800, fontSize: '0.78rem', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Admin Verificato</span>
         </div>
-        <div style={{ fontFamily: "'IBM Plex Mono', monospace", color: '#FFFFFF99', fontSize: '0.88rem', fontWeight: 600 }}>{profileEmail}</div>
-        <div style={{ marginTop: 8, color: '#FFFFFF66', fontSize: '0.72rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+        <div style={{ marginTop: 4, color: 'var(--b-black)', fontSize: '1.1rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
           {nome} {cognome}
         </div>
+        <div style={{ fontFamily: "'IBM Plex Mono', monospace", color: 'var(--b-gray)', fontSize: '0.85rem', fontWeight: 600, marginTop: 4 }}>{profileEmail}</div>
       </div>
 
       {/* Sezione Profilo */}
@@ -205,6 +220,6 @@ export default function AdminProfile({ email = 'admin@scuola.edu.it' }) {
       >
         <LogOut size={17} strokeWidth={2.5} /> Esci dall'Account
       </button>
-    </div>
+    </motion.div>
   );
 }

@@ -131,29 +131,29 @@ export default function StudentProfile({ email = 'student@scuola.edu.it' }) {
     <div style={{ maxWidth: 480, margin: '0 auto' }}>
       {/* Avatar Card */}
       <div style={{
-        background: 'var(--b-black)', border: '3px solid var(--b-black)',
+        background: 'var(--b-white)', border: '3px solid var(--b-black)',
         boxShadow: 'var(--b-shadow-lg)', padding: '28px 24px',
         display: 'flex', flexDirection: 'column', alignItems: 'center',
         textAlign: 'center', marginBottom: 20,
       }}>
         <div style={{
           width: 72, height: 72, background: 'var(--b-yellow)',
-          border: '3px solid var(--b-yellow)',
+          border: '3px solid var(--b-black)',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
           fontWeight: 800, fontSize: '1.5rem', color: 'var(--b-black)',
           fontFamily: "'IBM Plex Mono', monospace",
-          marginBottom: 14, boxShadow: '4px 4px 0 var(--b-yellow)',
+          marginBottom: 14, boxShadow: '4px 4px 0 var(--b-black)',
         }}>
           {initials}
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
-          <BadgeCheck size={14} color="var(--b-yellow)" strokeWidth={2.5} />
-          <span style={{ color: 'var(--b-yellow)', fontWeight: 800, fontSize: '0.78rem', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Verificato</span>
+          <BadgeCheck size={15} color="var(--b-blue)" strokeWidth={2.5} />
+          <span style={{ color: 'var(--b-blue)', fontWeight: 800, fontSize: '0.78rem', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Verificato</span>
         </div>
-        <div style={{ fontFamily: "'IBM Plex Mono', monospace", color: '#FFFFFF99', fontSize: '0.88rem', fontWeight: 600 }}>{profileEmail}</div>
-        <div style={{ marginTop: 8, color: '#FFFFFF66', fontSize: '0.72rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
-          {requireClass ? `${nome} ${cognome} • Classe ${classe || '--'}` : `${nome} ${cognome}`}
+        <div style={{ marginTop: 4, color: 'var(--b-black)', fontSize: '1.1rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+          {requireClass ? `${nome} ${cognome} • ${classe || '--'}` : `${nome} ${cognome}`}
         </div>
+        <div style={{ fontFamily: "'IBM Plex Mono', monospace", color: 'var(--b-gray)', fontSize: '0.85rem', fontWeight: 600, marginTop: 4 }}>{profileEmail}</div>
       </div>
 
       {/* Sezione Account */}
@@ -175,7 +175,7 @@ export default function StudentProfile({ email = 'student@scuola.edu.it' }) {
           )}
         />
         <div style={{ borderBottom: 'none' }}>
-          <BrutRow icon={Globe} label="Lingua" right={<span style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--b-gray)', marginRight: 8 }}>Italiano</span>} onClick={() => {}} />
+          <BrutRow icon={Globe} label="Lingua" right={<span style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--b-gray)', marginRight: 8 }}>Italiano</span>} onClick={() => { }} />
         </div>
       </div>
 
@@ -198,17 +198,17 @@ export default function StudentProfile({ email = 'student@scuola.edu.it' }) {
           )}
         />
         <div style={{ borderBottom: 'none' }}>
-          <BrutRow icon={Download} label="Esporta i miei dati" onClick={() => {}} />
+          <BrutRow icon={Download} label="Esporta i miei dati" onClick={() => { }} />
         </div>
       </div>
 
       {/* Sezione Info */}
       <div style={{ fontSize: '0.68rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.09em', color: 'var(--b-gray)', marginBottom: 6, marginLeft: 2 }}>Informazioni</div>
       <div style={{ border: '3px solid var(--b-black)', boxShadow: 'var(--b-shadow)', marginBottom: 24 }}>
-        <BrutRow icon={FileText}    label="Regole dell'App" onClick={() => {}} />
-        <BrutRow icon={Lock}        label="Informativa sulla Privacy" onClick={() => {}} />
+        <BrutRow icon={FileText} label="Regole dell'App" onClick={() => { }} />
+        <BrutRow icon={Lock} label="Informativa sulla Privacy" onClick={() => { }} />
         <div style={{ borderBottom: 'none' }}>
-          <BrutRow icon={HelpCircle} label="Supporto" onClick={() => {}} />
+          <BrutRow icon={HelpCircle} label="Supporto" onClick={() => { }} />
         </div>
       </div>
 

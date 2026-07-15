@@ -81,6 +81,41 @@ export function saveAdminProfile(next) {
   return normalized;
 }
 
+// === MOCK USERS per la pagina Gestione Utenti (Admin) ===
+const MOCK_USERS_STORAGE_KEY = 'dq_mock_users_list_v1';
+
+const defaultMockUsers = [
+  { id: 'u1', email: 'student1@scuola.edu.it', nome: 'Mario', cognome: 'Rossi', classe: '3B', role: 'student', status: 'active', reportCount: 4 },
+  { id: 'u2', email: 'student2@scuola.edu.it', nome: 'Giulia', cognome: 'Bianchi', classe: '5A', role: 'student', status: 'active', reportCount: 12 },
+  { id: 'u3', email: 'luca.verdi@scuola.edu.it', nome: 'Luca', cognome: 'Verdi', classe: '1C', role: 'student', status: 'blocked', reportCount: 0 },
+  { id: 'u4', email: 'admin@scuola.edu.it', nome: 'Preside', cognome: 'Scuola', classe: '', role: 'admin', status: 'active', reportCount: 0 },
+  { id: 'u5', email: 'prof.neri@scuola.edu.it', nome: 'Prof.', cognome: 'Neri', classe: '', role: 'admin', status: 'active', reportCount: 0 },
+];
+
+export function getAllUsers() {
+  const raw = safeRead(MOCK_USERS_STORAGE_KEY);
+  if (!raw) return defaultMockUsers;
+  return raw;
+}
+
+export function saveAllUsers(users) {
+  safeWrite(MOCK_USERS_STORAGE_KEY, users);
+}
+
+export function blockUser(userId, blockStatus) {
+  const users = getAllUsers();
+  const index = users.findIndex(u => u.id === userId);
+  if (index !== -1) {
+    users[index].status = blockStatus ? 'blocked' : 'active';
+    saveAllUsers(users);
+  }
+}
+
+export function deleteUser(userId) {
+  const users = getAllUsers().filter(u => u.id !== userId);
+  saveAllUsers(users);
+}
+
 export function patchAdminProfile(partial = {}) {
   return saveAdminProfile({ ...getAdminProfile(), ...partial });
 }

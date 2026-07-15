@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { QrCode, TrendingUp, FileText, Users, CheckCircle } from 'lucide-react';
+import { motion } from 'framer-motion';
 import Popup from '../../components/Popup';
 import CopyLinkButton from '../../components/CopyLinkButton';
 import { useReports, STATUS } from '../../services/mockStore';
@@ -167,7 +168,13 @@ export default function Dashboard() {
 
 
   return (
-    <div className="admin-page admin-page-wide">
+    <motion.div 
+      className="admin-page admin-page-wide"
+      initial={{ opacity: 0, y: 15 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, y: -15 }}
+      transition={{ duration: 0.3 }}
+    >
 
       {/* Header */}
       <div className="dash-header">
@@ -310,6 +317,6 @@ export default function Dashboard() {
           <button className="btn-primary" onClick={() => setShowQr(false)}>Chiudi ✕</button>
         </div>
       </Popup>
-    </div>
+    </motion.div>
   );
 }

@@ -2,7 +2,8 @@ const STORAGE_KEY = 'dq_settings_v1';
 
 const defaultSettings = {
   slug: 'liceo-ponti',
-  whitelist: ['studente1@scuola.edu.it', 'studente2@scuola.edu.it'],
+  emailFilterMode: 'exact', // 'exact' o 'domain'
+  whitelist: [],
   requireClass: true,
   categories: ['Un problema', 'Una proposta', 'Un dubbio'],
 };
@@ -31,7 +32,7 @@ function normalizeWhitelist(rawWhitelist) {
   const source = Array.isArray(rawWhitelist) ? rawWhitelist : [];
   const valid = source
     .map(normalizeEmail)
-    .filter((email) => isValidEmail(email));
+    .filter(Boolean); // Accetta sia email che domini (es. @istituto.it)
   return Array.from(new Set(valid));
 }
 
@@ -46,11 +47,13 @@ function normalizeCategories(rawCategories) {
 function normalize(raw = {}) {
   const fallback = defaultSettings;
   const slug = normalizeSlug(raw.slug || fallback.slug) || fallback.slug;
+  const emailFilterMode = raw.emailFilterMode === 'domain' ? 'domain' : 'exact';
   const whitelistSource = Array.isArray(raw.whitelist) ? raw.whitelist : fallback.whitelist;
   const whitelist = normalizeWhitelist(whitelistSource);
   const categories = normalizeCategories(raw.categories);
   return {
     slug,
+    emailFilterMode,
     whitelist,
     requireClass: typeof raw.requireClass === 'boolean' ? raw.requireClass : fallback.requireClass,
     categories,
@@ -78,7 +81,7 @@ export function getAllowedEmailSet() {
 }
 
 export function isWhitelistEnabled() {
-  return getAllowedEmailSet().size > 0;
+  return getSettings().whitelist.length > 0;
 }
 
 export function isSlugAllowed(slug = '') {

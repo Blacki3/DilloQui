@@ -22,12 +22,15 @@ const Dashboard = lazyFromBundle('Dashboard');
 const ReportsList = lazyFromBundle('ReportsList');
 const Settings = lazyFromBundle('Settings');
 const AdminProfile = lazyFromBundle('AdminProfile');
+const UsersList = lazyFromBundle('UsersList');
 const StudentLayout = lazyFromBundle('StudentLayout');
 const Forum = lazyFromBundle('Forum');
 const PostDetail = lazyFromBundle('PostDetail');
 const NewReport = lazyFromBundle('NewReport');
 const MyReports = lazyFromBundle('MyReports');
 const StudentProfile = lazyFromBundle('StudentProfile');
+const Drafts = lazyFromBundle('Drafts');
+const Tendenze = lazyFromBundle('Tendenze');
 
 // Fallback Loader in stile Brutalista
 const BrutalistLoader = () => (
@@ -112,9 +115,11 @@ function App() {
             </StudentProtectedRoute>
           }>
             <Route path="forum" element={<Forum />} />
+            <Route path="tendenze" element={<Tendenze />} />
             <Route path="post/:postId" element={<PostDetail />} />
             <Route path="new" element={<NewReport />} />
             <Route path="history" element={<MyReports />} />
+            <Route path="drafts" element={<Drafts />} />
             <Route path="profile" element={<StudentProfile />} />
           </Route>
 
@@ -129,6 +134,7 @@ function App() {
             <Route path="dashboard" element={<Dashboard />} />
             <Route path="reports" element={<ReportsList />} />
             <Route path="settings" element={<Settings />} />
+            <Route path="users" element={<UsersList />} />
             <Route path="profile" element={<AdminProfile />} />
           </Route>
 
@@ -142,6 +148,7 @@ function App() {
             <Route path="dashboard" element={<Dashboard />} />
             <Route path="reports" element={<ReportsList />} />
             <Route path="settings" element={<Settings />} />
+            <Route path="users" element={<UsersList />} />
             <Route path="profile" element={<AdminProfile />} />
           </Route>
 

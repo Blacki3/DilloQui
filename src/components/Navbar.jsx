@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { Menu, X, ArrowRight, ChevronRight } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
 import BrandWordmark from './BrandWordmark';
 
 const NAV_LINKS = [
@@ -132,53 +133,65 @@ export default function Navbar() {
             aria-expanded={menuOpen}
             aria-controls="public-mobile-menu"
           >
-            {menuOpen ? <X size={24} strokeWidth={3} /> : <Menu size={24} strokeWidth={2.5} />}
+            <AnimatePresence mode="wait" initial={false}>
+              <motion.div
+                key={menuOpen ? 'close' : 'open'}
+                initial={{ opacity: 0, rotate: -90, scale: 0.8 }}
+                animate={{ opacity: 1, rotate: 0, scale: 1 }}
+                exit={{ opacity: 0, rotate: 90, scale: 0.8 }}
+                transition={{ duration: 0.2 }}
+                style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+              >
+                {menuOpen ? <X size={24} strokeWidth={3} /> : <Menu size={24} strokeWidth={2.5} />}
+              </motion.div>
+            </AnimatePresence>
           </button>
         </div>
       </nav>
 
-      {menuOpen && (
-        <div className="public-mobile-menu" id="public-mobile-menu">
-          {NAV_LINKS.map((item) => (
-            <a
-              key={item.label}
-              href={item.path}
-              onClick={(e) => handleNavClick(e, item.path)}
-              className={`public-mobile-link ${activeItem === item.path ? 'active' : ''}`}
-            >
-              {item.label} <ChevronRight size={18} strokeWidth={3} />
-            </a>
-          ))}
+      <AnimatePresence>
+        {menuOpen && (
+          <motion.div
+            className="public-mobile-menu"
+            id="public-mobile-menu"
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
+            transition={{ duration: 0.2 }}
+          >
+            {NAV_LINKS.map((item) => (
+              <a
+                key={item.label}
+                href={item.path}
+                onClick={(e) => handleNavClick(e, item.path)}
+                className={`public-mobile-link ${activeItem === item.path ? 'active' : ''}`}
+              >
+                {item.label} <ChevronRight size={18} strokeWidth={3} />
+              </a>
+            ))}
 
-          <div className="public-mobile-cta-row">
-            <button
-              onClick={() => {
-                setMenuOpen(false);
-                navigate('/admin/login');
-              }}
-              className="public-navbar-btn public-navbar-btn-secondary public-mobile-cta"
-            >
-              Accedi
-            </button>
-            <button
-              onClick={() => {
-                setMenuOpen(false);
-                navigate('/admin/login');
-              }}
-              className="public-navbar-btn public-navbar-btn-primary public-mobile-cta"
-            >
-              Crea Box →
-            </button>
-          </div>
-        </div>
-      )}
-
-      <style>{`
-        @media (max-width: 768px) {
-          .lnav-desktop { display: none !important; }
-          .lnav-mobile-btn { display: flex !important; }
-        }
-      `}</style>
+            <div className="public-mobile-cta-row">
+              <button
+                onClick={() => {
+                  setMenuOpen(false);
+                  navigate('/admin/login');
+                }}
+                className="public-navbar-btn public-navbar-btn-secondary public-mobile-cta"
+              >
+                Accedi
+              </button>
+              <button
+                onClick={() => {
+                  setMenuOpen(false);
+                  navigate('/admin/login');
+                }}
+                className="public-navbar-btn public-navbar-btn-primary public-mobile-cta"
+              >
+                Crea Box →
+              </button>
+            </div>
+          </motion.div>
+        )}
     </>
   );
 }

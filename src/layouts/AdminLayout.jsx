@@ -1,5 +1,6 @@
 import { Link, useLocation, useNavigate, useOutlet } from 'react-router-dom';
-import { LayoutDashboard, Settings as SettingsIcon, MessageSquareWarning, LogOut, Menu, X, User, Settings, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
+import { LayoutDashboard, Settings as SettingsIcon, MessageSquareWarning, LogOut, Menu, X, User, PanelLeftClose, PanelLeftOpen, Users } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '../context/AuthContext';
 import { useState, useRef, useEffect } from 'react';
 import BrandWordmark from '../components/BrandWordmark';
@@ -45,6 +46,7 @@ export default function AdminLayout() {
   const menu = [
     { name: 'Dashboard',    path: `${basePath}/dashboard`, icon: LayoutDashboard },
     { name: 'Segnalazioni', path: `${basePath}/reports`,   icon: MessageSquareWarning, badge: unreadReportCount },
+    { name: 'Utenti',       path: `${basePath}/users`,     icon: Users },
     { name: 'Impostazioni', path: `${basePath}/settings`,  icon: SettingsIcon },
   ];
 
@@ -99,7 +101,18 @@ export default function AdminLayout() {
           aria-expanded={isMenuOpen}
           aria-controls="admin-sidebar-menu"
         >
-          {isMenuOpen ? <X size={22} strokeWidth={3} /> : <Menu size={22} strokeWidth={2.5} />}
+          <AnimatePresence mode="wait" initial={false}>
+            <motion.div
+              key={isMenuOpen ? 'close' : 'open'}
+              initial={{ opacity: 0, rotate: -90, scale: 0.8 }}
+              animate={{ opacity: 1, rotate: 0, scale: 1 }}
+              exit={{ opacity: 0, rotate: 90, scale: 0.8 }}
+              transition={{ duration: 0.2 }}
+              style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+            >
+              {isMenuOpen ? <X size={22} strokeWidth={3} /> : <Menu size={22} strokeWidth={2.5} />}
+            </motion.div>
+          </AnimatePresence>
         </button>
       </div>
 
@@ -145,20 +158,26 @@ export default function AdminLayout() {
               </div>
               <span className="admin-nav-label">Admin</span>
             </button>
-            {showProfile && (
-              <div className={`profile-popup admin-profile-popup${sidebarCollapsed ? ' admin-profile-popup--collapsed' : ''}`} id="admin-profile-menu">
-                <button className="profile-popup-item" onClick={() => { setShowProfile(false); navigate(`${basePath}/profile`); }}>
-                  <User size={15} /> Il mio Profilo
-                </button>
-                <button className="profile-popup-item" onClick={() => { setShowProfile(false); navigate(`${basePath}/settings`); }}>
-                  <Settings size={15} /> Impostazioni
-                </button>
-                <div className="profile-popup-divider" />
-                <button className="profile-popup-item danger" onClick={() => logoutAdmin()}>
-                  <LogOut size={15} /> Esci
-                </button>
-              </div>
-            )}
+            <AnimatePresence>
+              {showProfile && (
+                <motion.div 
+                  initial={{ opacity: 0, y: -10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -10 }}
+                  transition={{ duration: 0.2 }}
+                  className={`profile-popup admin-profile-popup${sidebarCollapsed ? ' admin-profile-popup--collapsed' : ''}`} 
+                  id="admin-profile-menu"
+                >
+                  <button className="profile-popup-item" onClick={() => { setShowProfile(false); navigate(`${basePath}/profile`); }}>
+                    <User size={15} /> Il mio Profilo
+                  </button>
+                  <div className="profile-popup-divider" />
+                  <button className="profile-popup-item danger" onClick={() => { logoutAdmin(); }}>
+                    <LogOut size={15} /> Esci
+                  </button>
+                </motion.div>
+              )}
+            </AnimatePresence>
           </div>
         </div>
       </aside>

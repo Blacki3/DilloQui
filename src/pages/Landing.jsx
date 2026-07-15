@@ -26,7 +26,7 @@ const features = [
   { icon: IncognitoIcon, tone: 'yellow', title: 'SEGNALAZIONI ANONIME', desc: 'Gli studenti segnalano senza paura. Risposte più oneste, sempre.' },
   { icon: LinkIcon, tone: 'blue', title: 'UN LINK, TUTTO DENTRO', desc: 'Nessuna app da scaricare. Basta condividere il link della box.' },
   { icon: Users, tone: 'orange', title: 'PER CLASSE O ISTITUTO', desc: 'Funziona per il singolo rappresentante di classe e per quello d\'istituto.' },
-  { icon: Zap, tone: 'yellow', title: 'PRONTO IN 5 MINUTI', desc: 'Registrazione, configurazione e link condiviso: tutto in meno di 5 minuti.' },
+  { icon: Zap, tone: 'yellow', title: 'PRONTO IN 5 MINUTI', desc: 'Registri, configuri, e condividi il link : tutto in meno di 5 minuti.' },
   { icon: Tags, tone: 'blue', title: 'CATEGORIE PERSONALIZZATE', desc: 'Organizza le segnalazioni per argomento — didattica, strutture, clima.' },
   { icon: BookStackIcon, tone: 'black', title: 'PENSATO PER LE SCUOLE', desc: 'Non è uno strumento generico, è pensato appositamente per la scuola.' },
 ];

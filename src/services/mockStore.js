@@ -1,18 +1,11 @@
 import { useSyncExternalStore } from 'react';
 import { getSettings } from './mockSettings';
 
-// Store mock condiviso per la demo.
-// Unica fonte di verita per segnalazioni, chat, voti e commenti.
-// Persistenza su localStorage cosi i dati restano coerenti tra le pagine
-// (NewReport -> ReportsList / MyReports / Forum) anche dopo un refresh.
-
-// v4: seed esteso su ~30 giorni (per popolare la vista "Mensile" con tutti e 5
-// i bucket settimanali) con la settimana corrente ben popolata e, per oggi,
-// segnalazioni distribuite su piu fasce orarie (per la vista "Giornaliero").
-// Alziamo la versione della chiave per invalidare le cache v1/v2/v3 e
-// rigenerare i dati nuovi.
-const STORAGE_KEY = 'dq_reports_v4';
-const ADMIN_READ_KEY = 'dq_admin_read_v1';
+// Store condiviso per la demo.
+// Unica fonte di verità per segnalazioni, chat, voti e commenti.
+// Persistenza su localStorage: i dati restano coerenti tra le pagine anche dopo un refresh.
+const STORAGE_KEY = 'dq_reports_v6';
+const ADMIN_READ_KEY = 'dq_admin_read_v2';
 
 const MONTHS = ['Gen', 'Feb', 'Mar', 'Apr', 'Mag', 'Giu', 'Lug', 'Ago', 'Set', 'Ott', 'Nov', 'Dic'];
 
@@ -35,8 +28,7 @@ function relTime(n) {
   return `${n} giorni fa`;
 }
 
-// Etichette categoria: lo store usa la chiave canonica minuscola,
-// le viste possono mostrare la versione "bella".
+// Etichette categoria: chiave canonica minuscola nello store, versione leggibile nelle viste.
 export const TYPE_LABEL = { problema: 'Problema', proposta: 'Proposta', dubbio: 'Dubbio' };
 export const TYPE_BADGE_CLASS = {
   problema: 'badge badge-problema',
@@ -88,17 +80,24 @@ export const STATUS_BADGE_CLASS = {
   [STATUS.closed]: 'badge badge-status-read',
 };
 
-// Mostra "Anonimo" all'admin/forum se la segnalazione e anonima.
+// Restituisce 'Anonimo' se la segnalazione è anonima, altrimenti 'Nome Cognome · Classe'.
 export function displayAuthor(report) {
-  return report.anonimo ? 'Anonimo' : report.authorName;
+  if (report.anonimo) return 'Anonimo';
+  const name = report.authorName;
+  if (name === 'Tu') return 'Tu · 3A';
+  
+  const classes = ['1A', '2B', '3C', '4A', '5B', '1B', '2C', '3A', '4B', '5C'];
+  const authorClass = report.authorClass || classes[(report.id || 0) % classes.length];
+  
+  return `${name} · ${authorClass}`;
 }
 
 // Pool di contenuti realistici (contesto scolastico italiano) usati per
 // generare un seed ricco ma deterministico.
 const STUDENT_NAMES = [
-  'Giulia R.', 'Marco T.', 'Sofia L.', 'Luca M.', 'Anna B.', 'Mario Rossi',
-  'Francesca P.', 'Davide C.', 'Chiara V.', 'Matteo G.', 'Elena S.',
-  'Alessandro F.', 'Martina D.', 'Lorenzo B.',
+  'Giulia Romano', 'Marco Torrisi', 'Sofia Leonardi', 'Luca Martini', 'Anna Bianchi', 'Mario Rossi',
+  'Francesca Parisi', 'Davide Costa', 'Chiara Vitale', 'Matteo Greco', 'Elena Santoro',
+  'Alessandro Ferrara', 'Martina De Luca', 'Lorenzo Bruno',
 ];
 
 const ADMIN_NAMES = ['Admin Rossi', 'Admin Bianchi', 'Prof.ssa Verdi'];
@@ -156,8 +155,7 @@ const COMMENT_POOL = [
   'Sarebbe davvero utile per tutti.',
 ];
 
-// Statuses pesati: ~70% risolte/chiuse per un tasso di risoluzione "sano",
-// il resto tra nuove e in revisione.
+// Pesi per gli stati: ~70% risolte/chiuse, ~30% nuove/in revisione.
 const STATUS_WEIGHTED = [
   'resolved', 'resolved', 'resolved', 'resolved',
   'closed', 'closed',
@@ -165,22 +163,19 @@ const STATUS_WEIGHTED = [
   'new', 'new',
 ];
 
-// Piano di distribuzione: quante segnalazioni "filler" creare per ciascun
-// giorno (chiave = giorni fa rispetto a oggi). La settimana corrente (0-6) e
-// densa per la vista "Settimanale"; i giorni 7-29 sono piu radi ma presenti su
-// tutti e 5 i bucket settimanali della vista "Mensile" (5 bucket x 6 giorni).
-// Conteggi variabili cosi i grafici mostrano valori diversi (non piatti).
+// Piano di distribuzione dei filler per giorno (key = giorni fa).
+// Settimana corrente densa; settimane precedenti più rade.
 const FILLER_DAY_COUNTS = {
-  // Settimana corrente (densa).
-  0: 6, 1: 6, 2: 4, 3: 6, 4: 3, 5: 5, 6: 4,
+  // Settimana corrente (molto densa).
+  0: 12, 1: 15, 2: 10, 3: 14, 4: 9, 5: 11, 6: 13,
   // Bucket "Sett. 4" (giorni 7-11).
-  7: 3, 8: 2, 9: 3, 10: 1, 11: 2,
+  7: 8, 8: 6, 9: 7, 10: 5, 11: 8,
   // Bucket "Sett. 3" (giorni 12-17).
-  12: 2, 13: 3, 14: 1, 15: 2, 16: 3, 17: 1,
+  12: 6, 13: 7, 14: 5, 15: 8, 16: 6, 17: 4,
   // Bucket "Sett. 2" (giorni 18-23).
-  18: 2, 19: 1, 20: 3, 21: 2, 22: 1, 23: 2,
+  18: 5, 19: 4, 20: 7, 21: 6, 22: 4, 23: 5,
   // Bucket "Sett. 1" (giorni 24-29, il piu vecchio).
-  24: 1, 25: 2, 26: 1, 27: 2, 28: 1, 29: 1,
+  24: 3, 25: 5, 26: 4, 27: 4, 28: 3, 29: 4,
 };
 
 // Espande FILLER_DAY_COUNTS in una lista ordinata dal piu recente al piu vecchio.
@@ -256,7 +251,7 @@ function buildSeed() {
       likes: 18,
       userVote: 0,
       comments: [
-        { id: 1, author: 'Anonimo', text: 'Bellissima idea, mi iscrivo subito!', time: '4 giorni fa' },
+        { id: 1, author: 'Anonimo', isAnon: true, authorClass: null, text: 'Bellissima idea, mi iscrivo subito!', time: '4 giorni fa' },
       ],
     },
     {
@@ -292,8 +287,9 @@ function buildSeed() {
       likes: 45,
       userVote: 0,
       comments: [
-        { id: 1, author: 'Anonimo', text: 'Sono d\'accordo, troppe bottigliette di plastica!', time: '1 ora fa' },
-        { id: 2, author: 'Anonimo', text: 'Magari uno per piano.', time: '40 min fa' },
+        { id: 1, author: 'Anonimo', isAnon: true, authorClass: null, text: 'Sono d\'accordo, troppe bottigliette di plastica!', time: '1 ora fa' },
+        { id: 2, author: 'Anonimo', isAnon: true, authorClass: null, text: 'Magari uno per piano.', time: '40 min fa', replyToId: 1 },
+        { id: 3, author: 'Giulia C.', isAnon: false, authorClass: '4A LING', text: 'Sì! Spero lo mettano anche al secondo.', time: '10 min fa', replyToId: 2 },
       ],
     },
     {
@@ -313,8 +309,9 @@ function buildSeed() {
       likes: 89,
       userVote: 0,
       comments: [
-        { id: 1, author: 'Anonimo', text: 'Confermo, in 1A si gela.', time: '5 ore fa' },
-        { id: 2, author: 'Anonimo', text: 'Ho avvisato la segreteria stamattina.', time: '3 ore fa' },
+        { id: 1, author: 'Anonimo', isAnon: true, authorClass: null, text: 'Confermo, in 1A si gela.', time: '5 ore fa' },
+        { id: 2, author: 'Anonimo', isAnon: true, authorClass: null, text: 'Ho avvisato la segreteria stamattina.', time: '3 ore fa' },
+        { id: 3, author: 'Marco T.', isAnon: false, authorClass: '5B SCI', text: 'Hanno detto che manderanno qualcuno oggi pomeriggio.', time: '2 ore fa', replyToId: 2 },
       ],
     },
     {
@@ -365,12 +362,17 @@ function buildSeed() {
 
     // Commenti solo per i post pubblici (compaiono in Bacheca / PostDetail).
     const commentCount = isPublic ? range(0, 3) : 0;
-    const comments = Array.from({ length: commentCount }, (_, c) => ({
-      id: c + 1,
-      author: rnd() < 0.6 ? 'Anonimo' : pick(STUDENT_NAMES),
-      text: pick(COMMENT_POOL),
-      time: relTime(replyOffset),
-    }));
+    const comments = Array.from({ length: commentCount }, (_, c) => {
+      const isAnonComment = rnd() < 0.6;
+      return {
+        id: c + 1,
+        author: isAnonComment ? 'Anonimo' : pick(STUDENT_NAMES),
+        isAnon: isAnonComment,
+        authorClass: isAnonComment ? null : pick(['3A INFO', '4B LING', '5A SCI', '2B MEC', '1A CLASS']),
+        text: pick(COMMENT_POOL),
+        time: `${range(1, 23)} ore fa`,
+      };
+    });
 
     return {
       id: 200 + i,
@@ -585,10 +587,10 @@ export function voteReport(reportId, value) {
   emit();
 }
 
-export function addComment(reportId, { text, author = 'Tu' }) {
+export function addComment(reportId, { text, author = 'Tu', authorClass = null, isAnon = false, replyToId = null }) {
   reports = reports.map((r) => {
     if (r.id !== reportId) return r;
-    const c = { id: Date.now(), author, text, time: 'Adesso' };
+    const c = { id: Date.now(), author, authorClass, isAnon, text, time: 'Adesso', replyToId };
     return { ...r, comments: [c, ...r.comments] };
   });
   emit();
@@ -597,6 +599,27 @@ export function addComment(reportId, { text, author = 'Tu' }) {
 export function useReports() {
   return useSyncExternalStore(subscribe, getSnapshot);
 }
+
+// ======================== MOCK NOTIFICHE ========================
+let mockNotifications = [
+  { id: 1, text: 'Giulia C. ha risposto al tuo commento su "Distributore d\'acqua".', time: '10 min fa', read: false, reportId: 104 },
+  { id: 2, text: 'La tua proposta "Club di scacchi" è stata approvata!', time: '1 ora fa', read: false, reportId: 102 },
+  { id: 3, text: 'Marco T. ha commentato "Riscaldamento rotto al piano terra".', time: '2 ore fa', read: true, reportId: 105 },
+  { id: 4, text: 'Admin Rossi ti ha menzionato in un commento.', time: 'Ieri', read: true, reportId: 101 },
+  { id: 5, text: 'Nuova segnalazione aggiunta in bacheca: "Nuovi cestini per il riciclaggio".', time: 'Ieri', read: true, reportId: 106 },
+  { id: 6, text: 'Il tuo post "Dubbio sulle date" ha ricevuto 3 nuovi mi piace.', time: '2 giorni fa', read: true, reportId: 103 },
+  { id: 7, text: 'Promemoria: compila il questionario settimanale.', time: '3 giorni fa', read: true, reportId: null },
+];
+
+export function useNotifications() {
+  return useSyncExternalStore(subscribe, () => mockNotifications);
+}
+
+export function markAllNotificationsRead() {
+  mockNotifications = mockNotifications.map(n => ({ ...n, read: true }));
+  emit();
+}
+// ================================================================
 
 export function useAdminReadVersion() {
   return useSyncExternalStore(subscribe, () => adminReadVersion);
