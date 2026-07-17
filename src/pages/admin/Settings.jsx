@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Check, Plus, Trash2 } from 'lucide-react';
+import { Check, Link, Plus, Trash2 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import CopyLinkButton from '../../components/CopyLinkButton';
 import { getSettings, saveSettings, isValidEmail } from '../../services/mockSettings';
