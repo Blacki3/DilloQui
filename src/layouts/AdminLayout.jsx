@@ -5,6 +5,8 @@ import { useAuth } from '../context/AuthContext';
 import { useState, useRef, useEffect } from 'react';
 import BrandWordmark from '../components/BrandWordmark';
 import { useUnreadReportCount } from '../services/mockStore';
+import { countNewStatus, useAdminReadVersionReal } from '../services/adminReadStore';
+import { getAllReports } from '../services/db';
 
 const SIDEBAR_COLLAPSED_KEY = 'dq_admin_sidebar_collapsed';
 
@@ -19,12 +21,18 @@ function readSidebarCollapsed() {
 export default function AdminLayout() {
   const location = useLocation();
   const navigate = useNavigate();
-  const { logoutAdmin } = useAuth();
+  const { logoutAdmin, logoutReal, profile } = useAuth();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(readSidebarCollapsed);
   const [showProfile, setShowProfile] = useState(false);
+  const [realNewCount, setRealNewCount] = useState(0);
   const profileRef = useRef(null);
   const currentOutlet = useOutlet();
+
+  const basePath = location.pathname.startsWith('/demo/admin') ? '/demo/admin' : '/admin';
+  const isDemo = basePath === '/demo/admin';
+  const boxSlug = isDemo ? null : profile?.box_slug;
+  const realReadVersion = useAdminReadVersionReal();
 
   useEffect(() => {
     try {
@@ -40,8 +48,30 @@ export default function AdminLayout() {
     return () => document.removeEventListener('mousedown', handler);
   }, []);
 
-  const basePath = location.pathname.startsWith('/demo/admin') ? '/demo/admin' : '/admin';
-  const unreadReportCount = useUnreadReportCount();
+  // Badge reale: conteggio leggero status===new (si aggiorna al cambio rotta / mark-read)
+  useEffect(() => {
+    if (isDemo || !boxSlug) {
+      setRealNewCount(0);
+      return;
+    }
+    let cancelled = false;
+    getAllReports(boxSlug)
+      .then((data) => {
+        if (!cancelled) setRealNewCount(countNewStatus(data || []));
+      })
+      .catch(() => {
+        if (!cancelled) setRealNewCount(0);
+      });
+    return () => { cancelled = true; };
+  }, [isDemo, boxSlug, location.pathname, realReadVersion]);
+
+  const mockUnreadReportCount = useUnreadReportCount();
+  const unreadReportCount = isDemo ? mockUnreadReportCount : realNewCount;
+
+  const handleLogout = () => {
+    if (isDemo) logoutAdmin();
+    else logoutReal();
+  };
 
   const menu = [
     { name: 'Dashboard',    path: `${basePath}/dashboard`, icon: LayoutDashboard },
@@ -172,7 +202,7 @@ export default function AdminLayout() {
                     <User size={15} /> Il mio Profilo
                   </button>
                   <div className="profile-popup-divider" />
-                  <button className="profile-popup-item danger" onClick={() => { logoutAdmin(); }}>
+                  <button className="profile-popup-item danger" onClick={handleLogout}>
                     <LogOut size={15} /> Esci
                   </button>
                 </motion.div>

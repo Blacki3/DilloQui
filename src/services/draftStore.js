@@ -1,7 +1,13 @@
 // ======================== DRAFT STORE ========================
-// Gestisce un archivio di bozze multiplo in localStorage
+// Gestisce un archivio di bozze multiplo in localStorage, scoped per box slug.
 
-const DRAFTS_KEY = 'dq_drafts_v3';
+const DRAFTS_KEY_LEGACY = 'dq_drafts_v3';
+const DRAFTS_KEY_PREFIX = 'dq_drafts_v3_';
+
+function draftsKey(slug) {
+  const s = String(slug || 'demo').toLowerCase().trim() || 'demo';
+  return `${DRAFTS_KEY_PREFIX}${s}`;
+}
 
 const DEMO_DRAFTS = [
   {
@@ -11,6 +17,7 @@ const DEMO_DRAFTS = [
     problema: "I bagni vicino alla palestra hanno una perdita d'acqua dal lavandino principale e non c'è mai carta. Andrebbero riparati.",
     isPublic: true,
     anonimo: true,
+    boxSlug: 'demo',
     savedAt: Date.now() - 1000 * 60 * 60 * 24 * 2, // 2 days ago
   },
   {
@@ -20,39 +27,70 @@ const DEMO_DRAFTS = [
     problema: 'Volevo proporre di organizzare un torneo di fine anno...',
     isPublic: false,
     anonimo: false,
+    boxSlug: 'demo',
     savedAt: Date.now() - 1000 * 60 * 60 * 5, // 5 hours ago
   }
 ];
 
-function getDrafts() {
+function migrateLegacyOnce(slug) {
+  const key = draftsKey(slug);
   try {
-    const raw = localStorage.getItem(DRAFTS_KEY);
+    if (localStorage.getItem(key)) return;
+    const legacy = localStorage.getItem(DRAFTS_KEY_LEGACY);
+    if (!legacy) return;
+    const parsed = JSON.parse(legacy);
+    if (!Array.isArray(parsed) || parsed.length === 0) return;
+    // Migra solo verso la box demo (o slug corrente se è la prima lettura):
+    // le bozze legacy non avevano boxSlug → le attribuiamo allo slug richiesto una sola volta.
+    const migrated = parsed.map((d) => ({
+      ...d,
+      boxSlug: d.boxSlug || slug || 'demo',
+    }));
+    localStorage.setItem(key, JSON.stringify(migrated));
+    // Rimuove la chiave legacy dopo la prima migrazione riuscita
+    localStorage.removeItem(DRAFTS_KEY_LEGACY);
+  } catch {
+    /* ignore */
+  }
+}
+
+function getDrafts(slug) {
+  const s = String(slug || 'demo').toLowerCase().trim() || 'demo';
+  migrateLegacyOnce(s);
+  const key = draftsKey(s);
+  try {
+    const raw = localStorage.getItem(key);
     if (!raw) {
-      localStorage.setItem(DRAFTS_KEY, JSON.stringify(DEMO_DRAFTS));
-      return DEMO_DRAFTS;
+      if (s === 'demo') {
+        localStorage.setItem(key, JSON.stringify(DEMO_DRAFTS));
+        return DEMO_DRAFTS;
+      }
+      return [];
     }
-    return JSON.parse(raw);
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
   } catch {
     return [];
   }
 }
 
-function setDrafts(drafts) {
+function setDrafts(slug, drafts) {
   try {
-    localStorage.setItem(DRAFTS_KEY, JSON.stringify(drafts));
+    localStorage.setItem(draftsKey(slug), JSON.stringify(drafts));
   } catch {}
 }
 
-export function getAllDrafts() {
-  return getDrafts().sort((a, b) => b.savedAt - a.savedAt);
+export function getAllDrafts(slug = 'demo') {
+  return getDrafts(slug).sort((a, b) => b.savedAt - a.savedAt);
 }
 
-export function getDraftById(id) {
-  return getDrafts().find(d => d.id === id) || null;
+export function getDraftById(id, slug = 'demo') {
+  return getDrafts(slug).find(d => d.id === id) || null;
 }
 
-export function saveDraft({ id, titolo, tipo, problema, isPublic, anonimo }) {
-  const drafts = getDrafts();
+export function saveDraft({ id, titolo, tipo, problema, isPublic, anonimo, boxSlug = 'demo' }) {
+  const slug = String(boxSlug || 'demo').toLowerCase().trim() || 'demo';
+  const drafts = getDrafts(slug);
   const draftId = id || `draft_${Date.now()}`;
   const existing = drafts.findIndex(d => d.id === draftId);
   const draft = {
@@ -62,6 +100,7 @@ export function saveDraft({ id, titolo, tipo, problema, isPublic, anonimo }) {
     problema,
     isPublic,
     anonimo,
+    boxSlug: slug,
     savedAt: Date.now(),
   };
   if (existing >= 0) {
@@ -69,16 +108,17 @@ export function saveDraft({ id, titolo, tipo, problema, isPublic, anonimo }) {
   } else {
     drafts.unshift(draft);
   }
-  setDrafts(drafts);
+  setDrafts(slug, drafts);
   return draftId;
 }
 
-export function deleteDraft(id) {
-  setDrafts(getDrafts().filter(d => d.id !== id));
+export function deleteDraft(id, slug = 'demo') {
+  const s = String(slug || 'demo').toLowerCase().trim() || 'demo';
+  setDrafts(s, getDrafts(s).filter(d => d.id !== id));
 }
 
-export function countDrafts() {
-  return getDrafts().length;
+export function countDrafts(slug = 'demo') {
+  return getDrafts(slug).length;
 }
 
 export function formatDraftDate(ts) {
@@ -106,6 +146,7 @@ export function seedDemoDrafts() {
       problema: 'Da novembre il termosifone dell\'aula 3B non funziona correttamente. La temperatura scende sotto i 15 gradi nelle giornate più fredde e molti compagni stanno avendo difficoltà a concentrarsi. Ho già segnalato la cosa al professore di turno ma non è cambiato nulla.',
       isPublic: false,
       anonimo: true,
+      boxSlug: 'demo',
       savedAt: now - 1000 * 60 * 30, // 30 minuti fa
     },
     {
@@ -115,6 +156,7 @@ export function seedDemoDrafts() {
       problema: 'Propongo di organizzare l\'ultimo giorno di scuola con un programma alleggerito: mattinata libera con attività proposte dagli studenti, come sport, musica o cineforum. Potremmo votare tra le classi cosa fare.',
       isPublic: true,
       anonimo: false,
+      boxSlug: 'demo',
       savedAt: now - 1000 * 60 * 60 * 3, // 3 ore fa
     },
     {
@@ -124,13 +166,14 @@ export function seedDemoDrafts() {
       problema: 'Sarebbe possibile estendere la copertura del wi-fi scolastico anche alla palestra e ai corridoi del piano terra? Spesso durante le ore libere non riusciamo a connetterci per fare ricerche.',
       isPublic: true,
       anonimo: true,
+      boxSlug: 'demo',
       savedAt: now - 1000 * 60 * 60 * 24, // ieri
     },
   ];
 
-  const existing = getDrafts();
+  const existing = getDrafts('demo');
   const existingIds = new Set(existing.map(d => d.id));
   const toAdd = demoDrafts.filter(d => !existingIds.has(d.id));
-  setDrafts([...toAdd, ...existing]);
+  setDrafts('demo', [...toAdd, ...existing]);
   localStorage.setItem(DEMO_DRAFTS_KEY, '1');
 }

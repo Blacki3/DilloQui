@@ -36,6 +36,42 @@ export const TYPE_BADGE_CLASS = {
   dubbio: 'badge badge-dubbio',
 };
 
+/** Normalizza per confronto: lowercase, spazi compressi. */
+export function slugifyType(type) {
+  return String(type || '')
+    .toLowerCase()
+    .trim()
+    .replace(/\s+/g, ' ');
+}
+
+/**
+ * Mappa etichette tipo "Un problema" / "Bullismo" a chiave canonica quando possibile.
+ * Non altera i dati salvati: solo display/filtro.
+ */
+export function canonicalTypeKey(type) {
+  const s = slugifyType(type);
+  if (!s) return '';
+  if (TYPE_LABEL[s]) return s;
+  // Ordine: proposta prima di problema per evitare falsi positivi su stringhe miste
+  if (/\bpropost/.test(s) || s.includes('proposta')) return 'proposta';
+  if (/\bdubbi/.test(s) || s.includes('dubbio')) return 'dubbio';
+  if (/\bproblem/.test(s) || s.includes('problema')) return 'problema';
+  return s;
+}
+
+/** True se due tipi coincidono (slug esatto, chiave canonica, o inclusione). */
+export function typesMatch(a, b) {
+  const ka = slugifyType(a);
+  const kb = slugifyType(b);
+  if (!ka || !kb) return false;
+  if (ka === kb) return true;
+  const ca = canonicalTypeKey(a);
+  const cb = canonicalTypeKey(b);
+  if (ca && cb && ca === cb) return true;
+  if (ka.includes(kb) || kb.includes(ka)) return true;
+  return false;
+}
+
 function formatGenericTypeLabel(type) {
   const raw = String(type || '').trim();
   if (!raw) return 'Altro';
@@ -46,16 +82,24 @@ function formatGenericTypeLabel(type) {
 }
 
 export function getTypeLabel(type) {
-  const key = String(type || '').toLowerCase();
+  const key = slugifyType(type);
   if (TYPE_LABEL[key]) return TYPE_LABEL[key];
-  const settingsMatch = getSettings().categories.find((category) => category.toLowerCase() === key);
-  if (settingsMatch) return settingsMatch;
+
+  const settingsExact = getSettings().categories.find((category) => category.toLowerCase() === key);
+  if (settingsExact) return settingsExact;
+
+  const settingsFuzzy = getSettings().categories.find((category) => typesMatch(category, type));
+  if (settingsFuzzy) return settingsFuzzy;
+
+  const canon = canonicalTypeKey(type);
+  if (TYPE_LABEL[canon]) return TYPE_LABEL[canon];
+
   return formatGenericTypeLabel(type);
 }
 
 export function getTypeBadgeClass(type) {
-  const key = String(type || '').toLowerCase();
-  return TYPE_BADGE_CLASS[key] || 'badge badge-dubbio';
+  const canon = canonicalTypeKey(type);
+  return TYPE_BADGE_CLASS[canon] || 'badge badge-dubbio';
 }
 
 // Stati canonici condivisi tra vista admin e vista studente.
@@ -82,14 +126,21 @@ export const STATUS_BADGE_CLASS = {
 
 // Restituisce 'Anonimo' se la segnalazione è anonima, altrimenti 'Nome Cognome · Classe'.
 export function displayAuthor(report) {
-  if (report.anonimo) return 'Anonimo';
+  if (report.anonimo || report.isAnonymous || report.is_anonymous) return 'Anonimo';
   const name = report.authorName;
+  if (!name) return 'Studente';
   if (name === 'Tu') return 'Tu · 3A';
-  
-  const classes = ['1A', '2B', '3C', '4A', '5B', '1B', '2C', '3A', '4B', '5C'];
-  const authorClass = report.authorClass || classes[(report.id || 0) % classes.length];
-  
-  return `${name} · ${authorClass}`;
+
+  if (report.authorClass) return `${name} · ${report.authorClass}`;
+
+  // Classi inventate solo per seed mock (id numerici); in reale non inventare
+  if (typeof report.id === 'number') {
+    const classes = ['1A', '2B', '3C', '4A', '5B', '1B', '2C', '3A', '4B', '5C'];
+    const authorClass = classes[(report.id || 0) % classes.length];
+    return `${name} · ${authorClass}`;
+  }
+
+  return name;
 }
 
 // Pool di contenuti realistici (contesto scolastico italiano) usati per
@@ -590,8 +641,18 @@ export function voteReport(reportId, value) {
 export function addComment(reportId, { text, author = 'Tu', authorClass = null, isAnon = false, replyToId = null }) {
   reports = reports.map((r) => {
     if (r.id !== reportId) return r;
-    const c = { id: Date.now(), author, authorClass, isAnon, text, time: 'Adesso', replyToId };
-    return { ...r, comments: [c, ...r.comments] };
+    const c = {
+      id: Date.now(),
+      author,
+      authorClass,
+      isAnon,
+      text,
+      time: 'Adesso',
+      createdAt: Date.now(),
+      replyToId,
+    };
+    // Cronologico oldest → newest (come in modalità reale + scroll in fondo)
+    return { ...r, comments: [...(r.comments || []), c] };
   });
   emit();
 }
@@ -617,6 +678,13 @@ export function useNotifications() {
 
 export function markAllNotificationsRead() {
   mockNotifications = mockNotifications.map(n => ({ ...n, read: true }));
+  emit();
+}
+
+export function markNotificationRead(id) {
+  mockNotifications = mockNotifications.map(n =>
+    n.id === id ? { ...n, read: true } : n
+  );
   emit();
 }
 // ================================================================

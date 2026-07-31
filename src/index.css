@@ -570,16 +570,30 @@ textarea:focus-visible {
   font-size: 0.8rem;
   margin-top: 0.75rem;
   font-weight: 700;
-  text-align: center;
-  padding: 10px 16px;
+  text-align: left;
+  padding: 12px 14px;
   border: var(--b-border);
   border-radius: var(--b-radius);
   display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
+  align-items: flex-start;
+  justify-content: flex-start;
+  gap: 10px;
   text-transform: uppercase;
   letter-spacing: 0.04em;
+  line-height: 1.45;
+}
+
+.msg > svg {
+  flex-shrink: 0;
+  width: 16px;
+  height: 16px;
+  margin-top: 1px;
+}
+
+.msg > span {
+  flex: 1;
+  min-width: 0;
+  word-break: break-word;
 }
 
 .msg.success {
@@ -2155,6 +2169,38 @@ textarea:focus-visible {
 .popup-close-btn:hover {
   box-shadow: var(--b-shadow);
   transform: translate(-1px, -1px);
+}
+
+/* ======================== FIELD VALIDATION ======================== */
+@keyframes field-shake {
+  0%, 100% { transform: translateX(0); }
+  20% { transform: translateX(-7px); }
+  40% { transform: translateX(7px); }
+  60% { transform: translateX(-4px); }
+  80% { transform: translateX(4px); }
+}
+
+.field-shake {
+  animation: field-shake 0.42s ease;
+}
+
+.field-invalid {
+  border: 2px solid var(--b-red) !important;
+  background: #FFF0F0 !important;
+  box-shadow: 3px 3px 0 var(--b-red) !important;
+}
+
+.field-label-error {
+  color: var(--b-red) !important;
+}
+
+.field-hint-error {
+  color: var(--b-red);
+  font-size: 0.75rem;
+  font-weight: 700;
+  margin-top: -6px;
+  margin-bottom: 12px;
+  letter-spacing: 0.02em;
 }
 
 /* ======================== RECHARTS FIX ======================== */

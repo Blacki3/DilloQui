@@ -1,23 +1,60 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { ThumbsUp, MessageSquare, TrendingUp, Crown, Medal, Award } from 'lucide-react';
 
 const DunceCapIcon = ({ size = 24 }) => (
   <img src="/dunce-cap-svgrepo-com.svg" width={size} height={size} alt="Asinello" />
 );
-import { useReports } from '../../services/mockStore';
+import { useReports as useReportsMock } from '../../services/mockStore';
+import { getPublicReports } from '../../services/db';
+
+function formatPostTime(createdAt) {
+  if (!createdAt) return '';
+  const d = new Date(createdAt);
+  if (!Number.isFinite(d.getTime())) return '';
+  return d.toLocaleString('it-IT', {
+    day: 'numeric',
+    month: 'short',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+}
 
 export default function Tendenze() {
   const { slug } = useParams();
   const navigate = useNavigate();
-  const reports = useReports();
-  const [activeTab, setActiveTab] = useState('giornalieri'); // 'giornalieri' or 'settimanali'
+  const isDemo = slug === 'demo';
+  const mockReports = useReportsMock();
+  const [realReports, setRealReports] = useState([]);
+  const [loading, setLoading] = useState(!isDemo);
+  const [activeTab, setActiveTab] = useState('giornalieri');
+
+  useEffect(() => {
+    if (isDemo) return;
+    setLoading(true);
+    getPublicReports(slug)
+      .then(data => setRealReports(data.map(r => {
+        const createdAt = new Date(r.created_at).getTime();
+        return {
+          ...r,
+          createdAt,
+          time: formatPostTime(createdAt),
+          isPublic: true,
+          likes: r.votes?.[0]?.count || 0,
+          comments: Array(r.comments?.[0]?.count || 0),
+        };
+      })))
+      .catch(console.error)
+      .finally(() => setLoading(false));
+  }, [isDemo, slug]);
+
+  const allReports = isDemo ? mockReports : realReports;
 
   // Calcola il punteggio di interazione
   const getInteractions = (r) => (r.likes || 0) + (r.comments?.length || 0);
 
   // Filtriamo i report pubblici
-  const publicReports = reports.filter(r => r.isPublic);
+  const publicReports = allReports.filter(r => r.isPublic);
 
   const now = Date.now();
   const DAY_MS = 24 * 60 * 60 * 1000;
@@ -70,7 +107,11 @@ export default function Tendenze() {
 
       {/* List */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-        {displayReports.length === 0 ? (
+        {loading ? (
+          <div style={{ padding: 32, textAlign: 'center', border: '3px solid var(--b-black)', background: 'var(--b-white)', boxShadow: 'var(--b-shadow-sm)' }}>
+            <p style={{ fontWeight: 700, color: 'var(--b-gray)', margin: 0 }}>Caricamento tendenze...</p>
+          </div>
+        ) : displayReports.length === 0 ? (
           <div style={{ padding: 32, textAlign: 'center', border: '3px solid var(--b-black)', background: 'var(--b-white)', boxShadow: 'var(--b-shadow-sm)' }}>
             <p style={{ fontWeight: 700, fontSize: '1.1rem', marginBottom: 8 }}>Nessun post trovato.</p>
             <p style={{ color: 'var(--b-gray)', fontSize: '0.9rem' }}>Non ci sono ancora abbastanza dati.</p>
@@ -107,6 +148,7 @@ export default function Tendenze() {
             const isPodium = index < 3;
             const textColor = index === 1 || index === 2 ? 'var(--b-white)' : 'var(--b-black)';
             const grayColor = index === 1 || index === 2 ? 'rgba(255,255,255,0.8)' : 'var(--b-gray)';
+            const timeLabel = report.time || formatPostTime(report.createdAt);
 
             return (
               <div
@@ -148,9 +190,11 @@ export default function Tendenze() {
                     <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                       <MessageSquare size={16} strokeWidth={2.5} color={textColor} /> <span style={{ color: textColor }}>{report.comments?.length || 0}</span>
                     </div>
-                    <div style={{ marginLeft: 'auto', fontSize: '0.75rem' }}>
-                      {report.time}
-                    </div>
+                    {timeLabel && (
+                      <div style={{ marginLeft: 'auto', fontSize: '0.75rem' }}>
+                        {timeLabel}
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>

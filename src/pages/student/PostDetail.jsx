@@ -1,11 +1,11 @@
 import { useParams, useNavigate } from 'react-router-dom';
 import { ThumbsUp, ThumbsDown, ArrowLeft, Send, MessageSquare, EyeOff, CornerUpLeft, X } from 'lucide-react';
 import { motion } from 'framer-motion';
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
 import {
-  useReport,
-  addComment,
-  voteReport,
+  useReport as useReportMock,
+  addComment as addCommentMock,
+  voteReport as voteReportMock,
   displayAuthor,
   getTypeLabel,
   getTypeBadgeClass,
@@ -13,6 +13,8 @@ import {
   STATUS_BADGE_CLASS,
 } from '../../services/mockStore';
 import { getStudentProfile } from '../../services/mockProfiles';
+import { getReport, getComments, addComment as addCommentReal, toggleVote, hasVoted } from '../../services/db';
+import { useAuth } from '../../context/AuthContext';
 
 /* Icona incognito da public/incognito-svgrepo-com.svg — inline per poter
    usare currentColor e scalare con la prop size */
@@ -51,29 +53,99 @@ function IncognitoIcon({ size = 24 }) {
 export default function PostDetail() {
   const { slug, postId } = useParams();
   const navigate = useNavigate();
+  const isDemo = slug === 'demo';
   const [newComment, setNewComment] = useState('');
   const [isAnon, setIsAnon] = useState(false);
   const [isPressing, setIsPressing] = useState(false);
   const [replyTo, setReplyTo] = useState(null);
-  const post = useReport(postId);
   const commentsEndRef = useRef(null);
-  const profile = getStudentProfile();
+  const profile = getStudentProfile();               // profilo mock (solo demo)
+  const { profile: authProfile } = useAuth();        // profilo Supabase (reale)
 
-  const handleVote = (value) => {
+  // ── Post: demo = mock, reale = Supabase ───────────────────────────────
+  const mockPost = useReportMock(postId);
+  const [realPost, setRealPost] = useState(null);
+  const [realComments, setRealComments] = useState([]);
+  const [loadingPost, setLoadingPost] = useState(!isDemo);
+
+  useEffect(() => {
+    if (isDemo) return;
+    setLoadingPost(true);
+    Promise.all([getReport(postId), getComments(postId), hasVoted(postId)])
+      .then(([post, comments, voted]) => {
+        setRealPost({
+          ...post,
+          createdAt: new Date(post.created_at).getTime(),
+          date: new Date(post.created_at).toLocaleDateString('it-IT', { day: 'numeric', month: 'short', year: 'numeric' }),
+          isPublic: post.is_public,
+          isAnonymous: post.is_anonymous,
+          anonimo: post.is_anonymous,
+          likes: post.votes?.[0]?.count || 0,
+          userVote: voted ? 1 : 0,
+        });
+        setRealComments(comments.map(c => ({
+          id: c.id,
+          text: c.content,
+          author: c.is_anonymous ? 'Anonimo' : (`${c.profiles?.nome || ''} ${c.profiles?.cognome || ''}`.trim() || 'Studente'),
+          authorClass: c.is_anonymous ? null : (c.profiles?.classe || null),
+          isAnon: c.is_anonymous,
+          isAdmin: c.profiles?.role === 'admin',
+          time: new Date(c.created_at).toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' }),
+          createdAt: new Date(c.created_at).getTime(),
+        })));
+      })
+      .catch(console.error)
+      .finally(() => setLoadingPost(false));
+  }, [isDemo, postId]);
+
+  // In modalità reale i commenti vivono in realComments: li innestiamo nel post
+  const post = isDemo
+    ? mockPost
+    : (realPost ? { ...realPost, comments: realComments } : null);
+
+  const handleVote = async (value) => {
     if (!post) return;
-    voteReport(post.id, value);
+    if (isDemo) {
+      voteReportMock(post.id, value);
+    } else {
+      try {
+        const res = await toggleVote(post.id);
+        setRealPost(prev => prev
+          ? { ...prev, likes: (prev.likes || 0) + (res.voted ? 1 : -1), userVote: res.voted ? 1 : 0 }
+          : prev);
+      } catch (err) { console.error(err); }
+    }
   };
 
-  const handleAddComment = () => {
+  const handleAddComment = async () => {
     if (!post) return;
     if (!newComment.trim()) return;
-    addComment(post.id, {
-      text: newComment.trim(),
-      author: isAnon ? 'Anonimo' : 'Tu',
-      authorClass: isAnon ? null : profile.classe,
-      isAnon,
-      replyToId: replyTo ? replyTo.id : null,
-    });
+    if (isDemo) {
+      addCommentMock(post.id, {
+        text: newComment.trim(),
+        author: isAnon ? 'Anonimo' : 'Tu',
+        authorClass: isAnon ? null : profile.classe,
+        isAnon,
+        replyToId: replyTo ? replyTo.id : null,
+      });
+    } else {
+      try {
+        const saved = await addCommentReal({ reportId: post.id, content: newComment.trim(), isAnonymous: isAnon });
+        setRealComments(prev => [...prev, {
+          id: saved.id,
+          text: saved.content,
+          author: isAnon ? 'Anonimo' : (`${authProfile?.nome || ''} ${authProfile?.cognome || ''}`.trim() || 'Tu'),
+          authorClass: isAnon ? null : (authProfile?.classe || null),
+          isAnon,
+          isAdmin: false,
+          time: new Date(saved.created_at).toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' }),
+          createdAt: new Date(saved.created_at).getTime(),
+        }]);
+      } catch (err) {
+        console.error(err);
+        return;
+      }
+    }
     setNewComment('');
     setReplyTo(null);
     setTimeout(() => {
@@ -104,6 +176,14 @@ export default function PostDetail() {
     }
     longPressFired.current = false;
   }, [newComment, isAnon, post]); // eslint-disable-line
+
+  if (loadingPost) {
+    return (
+      <div className="flat-panel" style={{ textAlign: 'center', padding: 40 }}>
+        <p style={{ color: 'var(--b-gray)', fontWeight: 700, margin: 0 }}>Caricamento segnalazione...</p>
+      </div>
+    );
+  }
 
   if (!post) {
     return (
@@ -180,19 +260,21 @@ export default function PostDetail() {
               </motion.div>
             </button>
             <span style={{ fontWeight: 800, fontSize: '1rem', fontFamily: "'IBM Plex Mono', monospace" }}>{Math.max(0, post.likes)}</span>
-            <button onClick={() => handleVote(-1)} className={`vote-btn vote-btn-down ${post.userVote === -1 ? 'active' : ''}`} aria-label="Vota negativamente il post" id="post-vote-down">
-              <motion.div
-                initial={false}
-                whileTap={{ scale: 0.7, rotate: 25 }}
-                animate={{ 
-                  rotate: post.userVote === -1 ? 15 : 0, 
-                  scale: post.userVote === -1 ? 1.15 : 1 
-                }}
-                transition={{ type: "spring", stiffness: 400, damping: 10 }}
-              >
-                <ThumbsDown size={15} strokeWidth={2.5} />
-              </motion.div>
-            </button>
+            {isDemo && (
+              <button onClick={() => handleVote(-1)} className={`vote-btn vote-btn-down ${post.userVote === -1 ? 'active' : ''}`} aria-label="Vota negativamente il post" id="post-vote-down">
+                <motion.div
+                  initial={false}
+                  whileTap={{ scale: 0.7, rotate: 25 }}
+                  animate={{
+                    rotate: post.userVote === -1 ? 15 : 0,
+                    scale: post.userVote === -1 ? 1.15 : 1
+                  }}
+                  transition={{ type: "spring", stiffness: 400, damping: 10 }}
+                >
+                  <ThumbsDown size={15} strokeWidth={2.5} />
+                </motion.div>
+              </button>
+            )}
           </div>
         </div>
       </div>
@@ -390,15 +472,17 @@ export default function PostDetail() {
         </div>
       </div>
 
-      {/* Lista Commenti */}
+      {/* Lista Commenti — sempre cronologico oldest → newest */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
-        {post.comments.map((comment, idx) => (
+        {[...post.comments]
+          .sort((a, b) => (a.createdAt || a.id || 0) - (b.createdAt || b.id || 0))
+          .map((comment, idx, list) => (
           <div
             key={comment.id}
             style={{
               background: idx % 2 === 0 ? 'var(--b-white)' : 'var(--b-cream)',
               border: '3px solid var(--b-black)',
-              borderBottom: idx < post.comments.length - 1 ? '2px solid var(--b-black)' : '3px solid var(--b-black)',
+              borderBottom: idx < list.length - 1 ? '2px solid var(--b-black)' : '3px solid var(--b-black)',
               padding: '16px 20px',
             }}
           >
@@ -433,14 +517,16 @@ export default function PostDetail() {
               )}
               <span style={{ color: 'var(--b-gray)', fontSize: '0.75rem', fontFamily: "'IBM Plex Mono', monospace", fontWeight: 600, marginLeft: 'auto' }}>{comment.time}</span>
               
-              {/* Bottone Rispondi */}
-              <button 
-                onClick={() => { setReplyTo(comment); document.getElementById('post-comment-input')?.focus(); }}
-                style={{ background: 'transparent', border: 'none', cursor: 'pointer', marginLeft: 8, padding: 4, display: 'flex', alignItems: 'center' }}
-                title="Rispondi"
-              >
-                <CornerUpLeft size={15} strokeWidth={2.5} color="var(--b-black)" />
-              </button>
+              {/* Bottone Rispondi — solo demo (reply threading non supportato in reale) */}
+              {isDemo && (
+                <button 
+                  onClick={() => { setReplyTo(comment); document.getElementById('post-comment-input')?.focus(); }}
+                  style={{ background: 'transparent', border: 'none', cursor: 'pointer', marginLeft: 8, padding: 4, display: 'flex', alignItems: 'center' }}
+                  title="Rispondi"
+                >
+                  <CornerUpLeft size={15} strokeWidth={2.5} color="var(--b-black)" />
+                </button>
+              )}
             </div>
 
             {/* Quoted Reply Block */}

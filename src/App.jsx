@@ -31,6 +31,7 @@ const MyReports = lazyFromBundle('MyReports');
 const StudentProfile = lazyFromBundle('StudentProfile');
 const Drafts = lazyFromBundle('Drafts');
 const Tendenze = lazyFromBundle('Tendenze');
+const Regolamento = lazyFromBundle('Regolamento');
 
 // Fallback Loader in stile Brutalista
 const BrutalistLoader = () => (
@@ -63,19 +64,27 @@ function ScrollToTop() {
 }
 
 // Protezione rotta Admin
-function AdminProtectedRoute({ children }) {
-  const { isAdminAuthenticated } = useAuth();
-  return isAdminAuthenticated ? children : <Navigate to="/admin/login" replace />;
+// allowMock=true solo per /demo/admin/* — il token mock NON sblocca /admin/*
+function AdminProtectedRoute({ children, allowMock = false }) {
+  const { isRealAdminAuthenticated, isAdminAuthenticated, loading } = useAuth();
+  if (loading) return <BrutalistLoader />;
+  const ok = allowMock ? isAdminAuthenticated : isRealAdminAuthenticated;
+  return ok ? children : <Navigate to="/admin/login" replace />;
 }
 
 // Gestione rotte Studenti (Box) - Solo per la rotta iniziale /box/:slug
 function BoxVerifyFlow() {
   const { slug } = useParams();
-  const { isStudentAuthenticated } = useAuth();
+  const { isStudentAuthenticated, loading, profile } = useAuth();
 
   if (!slug) return <Navigate to="/admin/login" replace />;
+  if (loading) return <BrutalistLoader />;
 
-  if (isStudentAuthenticated) {
+  // Studente già loggato, appartenente a questa box e con profilo COMPLETO
+  // (nome compilato): redirect al forum. Senza il controllo sul nome, il
+  // redirect scattava subito dopo la verifica OTP saltando il passo 3.
+  const profileComplete = !!profile?.nome;
+  if (isStudentAuthenticated && (slug === 'demo' || (profile?.box_slug === slug && profileComplete))) {
     return <Navigate to={`/box/${slug}/forum`} replace />;
   }
 
@@ -85,10 +94,18 @@ function BoxVerifyFlow() {
 // Protezione rotte interne studenti
 function StudentProtectedRoute({ children }) {
   const { slug } = useParams();
-  const { isStudentAuthenticated } = useAuth();
-  
+  const { isStudentAuthenticated, loading, profile } = useAuth();
+
   if (!slug) return <Navigate to="/admin/login" replace />;
-  return isStudentAuthenticated ? children : <Navigate to={`/box/${slug}`} replace />;
+  if (loading) return <BrutalistLoader />;
+
+  // Demo: basta il token mock. Reale: stessa box + profilo completo (nome),
+  // come BoxVerifyFlow — altrimenti si salta il passo 3 di Verify.
+  const isAuthorized = slug === 'demo'
+    ? isStudentAuthenticated
+    : (isStudentAuthenticated && profile?.box_slug === slug && !!profile?.nome);
+
+  return isAuthorized ? children : <Navigate to={`/box/${slug}`} replace />;
 }
 
 
@@ -120,6 +137,7 @@ function App() {
             <Route path="new" element={<NewReport />} />
             <Route path="history" element={<MyReports />} />
             <Route path="drafts" element={<Drafts />} />
+            <Route path="regolamento" element={<Regolamento />} />
             <Route path="profile" element={<StudentProfile />} />
           </Route>
 
@@ -138,9 +156,9 @@ function App() {
             <Route path="profile" element={<AdminProfile />} />
           </Route>
 
-          {/* Route Admin (DEMO) */}
+          {/* Route Admin (DEMO) — allowMock: solo qui il token mock è valido */}
           <Route path="/demo/admin" element={
-            <AdminProtectedRoute>
+            <AdminProtectedRoute allowMock>
               <AdminLayout />
             </AdminProtectedRoute>
           }>

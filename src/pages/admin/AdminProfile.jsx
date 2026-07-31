@@ -1,21 +1,29 @@
-import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useState, useEffect } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { getAdminProfile, patchAdminProfile } from '../../services/mockProfiles';
+import { updateMyProfile, getAllReports } from '../../services/db';
+import { getReports } from '../../services/mockStore';
+import { supabase } from '../../lib/supabaseClient';
+import NotificationPrefs from '../../components/NotificationPrefs';
+import { downloadTextFile, reportsToCsv, supportMailto } from '../../utils/download';
 import {
-  Bell, Shield, Download, Lock, HelpCircle,
+  Shield, Download, Lock, HelpCircle,
   ChevronRight, BadgeCheck, LogOut, User, ArrowLeft
 } from 'lucide-react';
 import { motion } from 'framer-motion';
 
-function BrutRow({ icon: Icon, label, sublabel, right, onClick }) {
+function BrutRow({ icon: Icon, label, sublabel, right, onClick, disabled, title }) {
+  const interactive = !!onClick && !disabled;
   return (
     <div
-      onClick={onClick}
-      role={onClick ? 'button' : undefined}
-      tabIndex={onClick ? 0 : undefined}
+      onClick={interactive ? onClick : undefined}
+      role={interactive ? 'button' : undefined}
+      tabIndex={interactive ? 0 : undefined}
+      title={title || (disabled ? 'Presto disponibile' : undefined)}
+      aria-disabled={disabled || undefined}
       onKeyDown={(e) => {
-        if (!onClick) return;
+        if (!interactive) return;
         if (e.key === 'Enter' || e.key === ' ') {
           e.preventDefault();
           onClick();
@@ -24,10 +32,12 @@ function BrutRow({ icon: Icon, label, sublabel, right, onClick }) {
       style={{
         display: 'flex', alignItems: 'center', gap: 14,
         padding: '14px 18px', borderBottom: '2px solid var(--b-black)',
-        background: 'var(--b-white)', cursor: onClick ? 'pointer' : 'default',
+        background: 'var(--b-white)',
+        cursor: disabled ? 'not-allowed' : (interactive ? 'pointer' : 'default'),
+        opacity: disabled ? 0.55 : 1,
         transition: 'background 0.1s',
       }}
-      onMouseEnter={e => { if (onClick) e.currentTarget.style.background = 'var(--b-cream)'; }}
+      onMouseEnter={e => { if (interactive) e.currentTarget.style.background = 'var(--b-cream)'; }}
       onMouseLeave={e => e.currentTarget.style.background = 'var(--b-white)'}
     >
       <div style={{ width: 36, height: 36, background: 'var(--b-blue)', border: '2px solid var(--b-black)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
@@ -38,44 +48,126 @@ function BrutRow({ icon: Icon, label, sublabel, right, onClick }) {
         {sublabel && <div style={{ fontSize: '0.75rem', color: 'var(--b-gray)', fontWeight: 500 }}>{sublabel}</div>}
       </span>
       {right}
-      {onClick && !right && <ChevronRight size={16} strokeWidth={2.5} color="var(--b-gray)" />}
+      {interactive && !right && <ChevronRight size={16} strokeWidth={2.5} color="var(--b-gray)" />}
     </div>
   );
 }
 
-function BrutToggle({ on, onClick }) {
-  return (
-    <button
-      onClick={e => { e.stopPropagation(); onClick(); }}
-      aria-label={on ? 'Disattiva opzione' : 'Attiva opzione'}
-      aria-pressed={on}
-      style={{
-        width: 52, height: 28, background: on ? 'var(--b-yellow)' : 'var(--b-gray-l)',
-        border: '2px solid var(--b-black)', cursor: 'pointer',
-        position: 'relative', flexShrink: 0, transition: 'background 0.1s',
-        fontFamily: "'Space Grotesk', sans-serif",
-      }}
-    >
-      <div style={{
-        position: 'absolute', top: 3, left: on ? 24 : 3,
-        width: 18, height: 18, background: 'var(--b-black)',
-        transition: 'left 0.12s',
-      }} />
-    </button>
-  );
-}
-
 export default function AdminProfile({ email = 'admin@scuola.edu.it' }) {
-  const { logoutAdmin } = useAuth();
+  const { logoutAdmin, logoutReal, profile: supabaseProfile, refreshProfile, session } = useAuth();
   const navigate = useNavigate();
-  const savedProfile = getAdminProfile();
-  const [notifications, setNotifications] = useState(savedProfile.notifications);
-  const [isEditingProfile, setIsEditingProfile] = useState(false);
-  const [nome, setNome] = useState(savedProfile.nome);
-  const [cognome, setCognome] = useState(savedProfile.cognome);
-  const profileEmail = savedProfile.email || email;
+  const location = useLocation();
+  const isDemo = location.pathname.startsWith('/demo');
 
+  const savedProfile = getAdminProfile();
+  const displayProfile = isDemo ? savedProfile : (supabaseProfile || savedProfile);
+
+  const [notifPrefs, setNotifPrefs] = useState(displayProfile.notif_prefs || { push_enabled: false });
+  const [isEditingProfile, setIsEditingProfile] = useState(false);
+  const [nome, setNome] = useState(displayProfile.nome || '');
+  const [cognome, setCognome] = useState(displayProfile.cognome || '');
+  const [actionMsg, setActionMsg] = useState('');
+  const [actionOk, setActionOk] = useState(true);
+  const [busyAction, setBusyAction] = useState(false);
+
+  useEffect(() => {
+    if (!isDemo && supabaseProfile) {
+      setNome(supabaseProfile.nome || '');
+      setCognome(supabaseProfile.cognome || '');
+      setNotifPrefs(supabaseProfile.notif_prefs || { push_enabled: false });
+    }
+  }, [isDemo, supabaseProfile]);
+
+  const profileEmail = displayProfile.email || supabaseProfile?.email || email;
   const initials = profileEmail.split('@')[0].slice(0, 2).toUpperCase();
+  const boxSlug = isDemo ? 'demo' : (supabaseProfile?.box_slug || '');
+  const showVerifiedBadge = !isDemo && !!session;
+
+  const showAction = (msg, type = 'success') => {
+    setActionMsg(msg);
+    setActionOk(type !== 'error');
+    setTimeout(() => setActionMsg(''), 4000);
+  };
+
+  const handleLogout = () => {
+    if (isDemo) {
+      logoutAdmin();
+    } else {
+      logoutReal();
+    }
+  };
+
+  const handleSaveProfile = async () => {
+    if (isDemo) {
+      patchAdminProfile({
+        nome: nome.trim(),
+        cognome: cognome.trim(),
+      });
+    } else {
+      try {
+        await updateMyProfile({
+          nome: nome.trim(),
+          cognome: cognome.trim(),
+        });
+        await refreshProfile();
+      } catch (err) {
+        console.error('Errore aggiornamento profilo admin:', err);
+        return;
+      }
+    }
+    setIsEditingProfile(false);
+  };
+
+  const handleExportCsv = async () => {
+    setBusyAction(true);
+    try {
+      let reports = [];
+      if (isDemo) {
+        reports = getReports();
+      } else {
+        if (!boxSlug) throw new Error('Nessuno sportello collegato.');
+        reports = await getAllReports(boxSlug);
+      }
+      const csv = reportsToCsv(reports);
+      const stamp = new Date().toISOString().slice(0, 10);
+      downloadTextFile(
+        `dilloqui-segnalazioni-${boxSlug || 'export'}-${stamp}.csv`,
+        csv,
+        'text/csv;charset=utf-8',
+      );
+      showAction(`Esportate ${reports.length} segnalazioni.`);
+    } catch (err) {
+      console.error(err);
+      showAction(err?.message || 'Esportazione non riuscita.', 'error');
+    } finally {
+      setBusyAction(false);
+    }
+  };
+
+  const handleChangePassword = async () => {
+    if (isDemo) return;
+    if (!profileEmail) {
+      showAction('Email non disponibile.', 'error');
+      return;
+    }
+    setBusyAction(true);
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(profileEmail, {
+        redirectTo: `${window.location.origin}/admin/login`,
+      });
+      if (error) throw error;
+      showAction(`Email di recupero inviata a ${profileEmail}.`);
+    } catch (err) {
+      console.error(err);
+      showAction(err?.message || 'Invio email non riuscito.', 'error');
+    } finally {
+      setBusyAction(false);
+    }
+  };
+
+  const handleSupport = () => {
+    window.location.href = supportMailto({ slug: boxSlug || 'admin', role: 'admin' });
+  };
 
   if (isEditingProfile) {
     return (
@@ -109,13 +201,7 @@ export default function AdminProfile({ email = 'admin@scuola.edu.it' }) {
           <input value={cognome} onChange={e => setCognome(e.target.value)} id="admin-cognome" />
           <button
             className="btn-primary"
-            onClick={() => {
-              patchAdminProfile({
-                nome: nome.trim(),
-                cognome: cognome.trim(),
-              });
-              setIsEditingProfile(false);
-            }}
+            onClick={handleSaveProfile}
             id="admin-profile-save"
           >
             Salva Modifiche ✓
@@ -134,6 +220,27 @@ export default function AdminProfile({ email = 'admin@scuola.edu.it' }) {
       exit={{ opacity: 0, y: -15 }}
       transition={{ duration: 0.3 }}
     >
+      {actionMsg && (
+        <div
+          role="status"
+          aria-live="polite"
+          style={{
+            marginBottom: 16,
+            padding: '12px 16px',
+            background: actionOk ? 'var(--b-yellow)' : 'var(--b-red)',
+            color: actionOk ? 'var(--b-black)' : '#FFFFFF',
+            border: '2px solid var(--b-black)',
+            boxShadow: 'var(--b-shadow-sm)',
+            fontSize: '0.82rem',
+            fontWeight: 800,
+            textTransform: 'uppercase',
+            letterSpacing: '0.04em',
+          }}
+        >
+          {actionOk ? '✓' : '✕'} {actionMsg}
+        </div>
+      )}
+
       {/* Avatar Card */}
       <div style={{
         background: 'var(--b-white)', border: '3px solid var(--b-black)',
@@ -153,7 +260,9 @@ export default function AdminProfile({ email = 'admin@scuola.edu.it' }) {
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
           <BadgeCheck size={15} color="var(--b-blue)" strokeWidth={2.5} />
-          <span style={{ color: 'var(--b-blue)', fontWeight: 800, fontSize: '0.78rem', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Admin Verificato</span>
+          <span style={{ color: 'var(--b-blue)', fontWeight: 800, fontSize: '0.78rem', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+            {showVerifiedBadge ? 'Admin verificato' : 'Account attivo'}
+          </span>
         </div>
         <div style={{ marginTop: 4, color: 'var(--b-black)', fontSize: '1.1rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
           {nome} {cognome}
@@ -164,46 +273,55 @@ export default function AdminProfile({ email = 'admin@scuola.edu.it' }) {
       {/* Sezione Profilo */}
       <div style={{ fontSize: '0.68rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.09em', color: 'var(--b-gray)', marginBottom: 6, marginLeft: 2 }}>Preferenze Profilo</div>
       <div style={{ border: '3px solid var(--b-black)', boxShadow: 'var(--b-shadow)', marginBottom: 20 }}>
-        <BrutRow icon={User} label="Dati Personali" onClick={() => setIsEditingProfile(true)} />
         <div style={{ borderBottom: 'none' }}>
-          <BrutRow
-            icon={Bell}
-            label="Notifiche Email"
-            right={(
-              <BrutToggle
-                on={notifications}
-                onClick={() => {
-                  const next = !notifications;
-                  setNotifications(next);
-                  patchAdminProfile({ notifications: next });
-                }}
-              />
-            )}
-          />
+          <BrutRow icon={User} label="Dati Personali" onClick={() => setIsEditingProfile(true)} />
         </div>
       </div>
+
+      <NotificationPrefs
+        role="admin"
+        isDemo={isDemo}
+        prefs={isDemo ? notifPrefs : (supabaseProfile?.notif_prefs || notifPrefs)}
+        onPrefsChange={(next) => {
+          setNotifPrefs(next);
+          if (isDemo) patchAdminProfile({ notifications: next.push_enabled, notif_prefs: next });
+          else refreshProfile();
+        }}
+      />
 
       {/* Gestione Piattaforma */}
       <div style={{ fontSize: '0.68rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.09em', color: 'var(--b-gray)', marginBottom: 6, marginLeft: 2 }}>Gestione Piattaforma</div>
       <div style={{ border: '3px solid var(--b-black)', boxShadow: 'var(--b-shadow)', marginBottom: 20 }}>
-        <BrutRow icon={Shield} label="Impostazioni Scuola" onClick={() => navigate('/admin/settings')} />
+        <BrutRow icon={Shield} label="Impostazioni Scuola" onClick={() => navigate(isDemo ? '/demo/admin/settings' : '/admin/settings')} />
         <div style={{ borderBottom: 'none' }}>
-          <BrutRow icon={Download} label="Esporta Segnalazioni (CSV)" onClick={() => {}} />
+          <BrutRow
+            icon={Download}
+            label="Esporta Segnalazioni (CSV)"
+            sublabel={busyAction ? 'Preparazione...' : undefined}
+            onClick={busyAction ? undefined : handleExportCsv}
+          />
         </div>
       </div>
 
       {/* Sicurezza */}
       <div style={{ fontSize: '0.68rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.09em', color: 'var(--b-gray)', marginBottom: 6, marginLeft: 2 }}>Sicurezza</div>
       <div style={{ border: '3px solid var(--b-black)', boxShadow: 'var(--b-shadow)', marginBottom: 24 }}>
-        <BrutRow icon={Lock} label="Cambia Password" onClick={() => {}} />
+        <BrutRow
+          icon={Lock}
+          label="Cambia Password"
+          sublabel={isDemo ? 'Presto disponibile' : 'Invia email di recupero'}
+          disabled={isDemo || busyAction}
+          title={isDemo ? 'Presto disponibile' : undefined}
+          onClick={isDemo ? undefined : handleChangePassword}
+        />
         <div style={{ borderBottom: 'none' }}>
-          <BrutRow icon={HelpCircle} label="Assistenza Tecnica" onClick={() => {}} />
+          <BrutRow icon={HelpCircle} label="Assistenza Tecnica" onClick={handleSupport} />
         </div>
       </div>
 
       {/* Logout */}
       <button
-        onClick={logoutAdmin}
+        onClick={handleLogout}
         style={{
           display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
           width: '100%', padding: '14px 24px',

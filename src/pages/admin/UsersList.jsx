@@ -1,41 +1,78 @@
 import { useState, useEffect } from 'react';
 import { Shield, ShieldBan, Trash2, User, Search } from 'lucide-react';
 import { motion } from 'framer-motion';
+import { useLocation } from 'react-router-dom';
+import { useAuth } from '../../context/AuthContext';
+// Mock (solo per la demo)
 import { getAllUsers, blockUser, deleteUser } from '../../services/mockProfiles';
+// Reale
+import { getBoxUsers } from '../../services/db';
 
 export default function UsersList() {
   const [users, setUsers] = useState([]);
   const [search, setSearch] = useState('');
+  const [loading, setLoading] = useState(true);
+  const location = useLocation();
+  const { profile } = useAuth();
+  const isDemo = location.pathname.startsWith('/demo/admin');
+  const boxSlug = isDemo ? 'demo' : profile?.box_slug;
 
-  const loadUsers = () => {
-    setUsers(getAllUsers());
+  const loadUsers = async () => {
+    setLoading(true);
+    try {
+      if (isDemo) {
+        setUsers(getAllUsers());
+      } else if (boxSlug) {
+        const data = await getBoxUsers(boxSlug);
+        setUsers(data);
+      }
+    } catch (err) {
+      console.error('Errore caricamento utenti:', err);
+    } finally {
+      setLoading(false);
+    }
   };
 
-  useEffect(() => {
-    loadUsers();
-  }, []);
+  useEffect(() => { loadUsers(); }, [isDemo, boxSlug]);
+
+  // Profilo admin senza sportello collegato
+  if (!isDemo && profile && !boxSlug) {
+    return (
+      <div className="admin-page" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 300 }}>
+        <div className="flat-panel" style={{ maxWidth: 480, textAlign: 'center', padding: 24 }}>
+          <h3 style={{ textTransform: 'uppercase', marginBottom: 8 }}>Nessuno sportello collegato</h3>
+          <p style={{ color: 'var(--b-gray)', fontSize: '0.9rem', margin: 0 }}>
+            Il tuo profilo admin non è collegato a nessuna Box.
+            Probabilmente la registrazione non è andata a buon fine:
+            contatta il supporto o ripeti la registrazione dello sportello.
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   const handleBlock = (id, isBlocked) => {
+    if (!isDemo) return; // Blocco non implementato su Supabase in questa fase
     blockUser(id, !isBlocked);
     loadUsers();
   };
 
   const handleDelete = (id) => {
-    if (window.confirm("Sei sicuro di voler eliminare questo utente?")) {
-      deleteUser(id);
-      loadUsers();
-    }
+    if (!window.confirm('Sei sicuro di voler eliminare questo utente?')) return;
+    if (!isDemo) return; // Eliminazione non implementata su Supabase in questa fase
+    deleteUser(id);
+    loadUsers();
   };
 
-  const filtered = users.filter(u => 
-    u.nome.toLowerCase().includes(search.toLowerCase()) ||
-    u.cognome.toLowerCase().includes(search.toLowerCase()) ||
-    u.email.toLowerCase().includes(search.toLowerCase())
+  const filtered = users.filter(u =>
+    (u.nome || '').toLowerCase().includes(search.toLowerCase()) ||
+    (u.cognome || '').toLowerCase().includes(search.toLowerCase()) ||
+    (u.email || '').toLowerCase().includes(search.toLowerCase())
   );
 
   return (
-    <motion.div 
-      className="admin-page admin-page-wide" 
+    <motion.div
+      className="admin-page admin-page-wide"
       style={{ paddingBottom: 60 }}
       initial={{ opacity: 0, y: 15 }}
       animate={{ opacity: 1, y: 0 }}
@@ -55,10 +92,10 @@ export default function UsersList() {
       <div style={{ marginBottom: 20, display: 'flex', gap: 10 }}>
         <div style={{ display: 'flex', alignItems: 'center', flex: 1, border: '2px solid var(--b-black)', background: 'var(--b-white)', padding: '0 12px', boxShadow: 'var(--b-shadow-sm)' }}>
           <Search size={18} color="var(--b-gray)" />
-          <input 
-            type="text" 
-            placeholder="Cerca per nome o email..." 
-            value={search} 
+          <input
+            type="text"
+            placeholder="Cerca per nome o email..."
+            value={search}
             onChange={e => setSearch(e.target.value)}
             style={{ border: 'none', background: 'transparent', flex: 1, padding: '12px', outline: 'none', fontWeight: 700 }}
           />
@@ -66,7 +103,9 @@ export default function UsersList() {
       </div>
 
       <div style={{ border: '3px solid var(--b-black)', background: 'var(--b-cream)', boxShadow: 'var(--b-shadow)', overflowX: 'auto' }}>
-        {filtered.length === 0 ? (
+        {loading ? (
+          <div style={{ padding: 40, textAlign: 'center', color: 'var(--b-gray)', fontWeight: 700 }}>Caricamento utenti...</div>
+        ) : filtered.length === 0 ? (
           <div style={{ padding: 40, textAlign: 'center', color: 'var(--b-gray)', fontWeight: 700 }}>Nessun utente trovato.</div>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', minWidth: 800 }}>
@@ -75,8 +114,15 @@ export default function UsersList() {
               <div>Utente</div>
               <div>Email</div>
               <div>Ruolo</div>
-              <div>Attività</div>
-              <div style={{ textAlign: 'right' }}>Azioni</div>
+              <div>Classe</div>
+              <div style={{ textAlign: 'right' }}>
+                Azioni
+                {!isDemo && (
+                  <div style={{ fontSize: '0.65rem', fontWeight: 700, textTransform: 'none', letterSpacing: 0, color: 'var(--b-black)', opacity: 0.7, marginTop: 2 }}>
+                    Solo lettura
+                  </div>
+                )}
+              </div>
             </div>
             {filtered.map((u, i) => {
               const isBlocked = u.status === 'blocked';
@@ -88,12 +134,11 @@ export default function UsersList() {
                     </div>
                     <div>
                       <div style={{ fontWeight: 800, fontSize: '0.9rem', color: isBlocked ? 'var(--b-red)' : 'var(--b-black)', textDecoration: isBlocked ? 'line-through' : 'none' }}>{u.nome} {u.cognome}</div>
-                      {u.classe && <div style={{ fontSize: '0.75rem', color: 'var(--b-gray)', fontWeight: 600 }}>Classe {u.classe}</div>}
                     </div>
                   </div>
-                  
+
                   <div style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: '0.85rem' }}>{u.email}</div>
-                  
+
                   <div>
                     <span style={{ background: u.role === 'admin' ? 'var(--b-blue)' : 'var(--b-gray-l)', color: u.role === 'admin' ? '#fff' : '#000', padding: '4px 8px', fontSize: '0.7rem', fontWeight: 800, textTransform: 'uppercase', border: '1px solid var(--b-black)' }}>
                       {u.role === 'admin' ? 'Admin' : 'Studente'}
@@ -101,14 +146,14 @@ export default function UsersList() {
                   </div>
 
                   <div style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--b-gray)' }}>
-                    {u.role === 'student' ? `${u.reportCount} post` : '-'}
+                    {u.classe || '-'}
                   </div>
 
                   <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
-                    {u.role !== 'admin' && (
-                      <button 
+                    {isDemo && u.role !== 'admin' && (
+                      <button
                         onClick={() => handleBlock(u.id, isBlocked)}
-                        title={isBlocked ? "Sblocca utente" : "Blocca utente"}
+                        title={isBlocked ? 'Sblocca utente' : 'Blocca utente'}
                         style={{ background: isBlocked ? 'var(--b-green)' : 'var(--b-orange)', border: '2px solid var(--b-black)', cursor: 'pointer', padding: 6, display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'transform 0.1s' }}
                         onMouseEnter={e => e.currentTarget.style.transform = 'translate(-1px,-1px)'}
                         onMouseLeave={e => e.currentTarget.style.transform = 'none'}
@@ -116,15 +161,17 @@ export default function UsersList() {
                         {isBlocked ? <Shield size={16} color="#000" /> : <ShieldBan size={16} color="#000" />}
                       </button>
                     )}
-                    <button 
-                      onClick={() => handleDelete(u.id)}
-                      title="Elimina utente"
-                      style={{ background: 'var(--b-red)', border: '2px solid var(--b-black)', cursor: 'pointer', padding: 6, display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'transform 0.1s' }}
-                      onMouseEnter={e => e.currentTarget.style.transform = 'translate(-1px,-1px)'}
-                      onMouseLeave={e => e.currentTarget.style.transform = 'none'}
-                    >
-                      <Trash2 size={16} color="#fff" />
-                    </button>
+                    {isDemo && (
+                      <button
+                        onClick={() => handleDelete(u.id)}
+                        title="Elimina utente"
+                        style={{ background: 'var(--b-red)', border: '2px solid var(--b-black)', cursor: 'pointer', padding: 6, display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'transform 0.1s' }}
+                        onMouseEnter={e => e.currentTarget.style.transform = 'translate(-1px,-1px)'}
+                        onMouseLeave={e => e.currentTarget.style.transform = 'none'}
+                      >
+                        <Trash2 size={16} color="#fff" />
+                      </button>
+                    )}
                   </div>
                 </div>
               );

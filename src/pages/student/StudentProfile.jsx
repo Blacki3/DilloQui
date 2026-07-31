@@ -1,20 +1,28 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
+import { useParams, useNavigate } from 'react-router-dom';
 import { getSettings } from '../../services/mockSettings';
 import { getStudentProfile, patchStudentProfile } from '../../services/mockProfiles';
+import { updateMyProfile, getBox, getMyReports, getMyAnonReports } from '../../services/db';
+import { getReports } from '../../services/mockStore';
+import NotificationPrefs from '../../components/NotificationPrefs';
+import { downloadTextFile, supportMailto } from '../../utils/download';
 import {
-  Bell, Globe, Shield, Download, FileText, Lock, HelpCircle,
-  ChevronRight, LogOut, User, ArrowLeft, BadgeCheck
+  Shield, Download, FileText, Lock, HelpCircle,
+  ChevronRight, LogOut, User, ArrowLeft, BadgeCheck, ScrollText
 } from 'lucide-react';
 
-function BrutRow({ icon: Icon, label, sublabel, right, onClick }) {
+function BrutRow({ icon: Icon, label, sublabel, right, onClick, disabled, title }) {
+  const interactive = !!onClick && !disabled;
   return (
     <div
-      onClick={onClick}
-      role={onClick ? 'button' : undefined}
-      tabIndex={onClick ? 0 : undefined}
+      onClick={interactive ? onClick : undefined}
+      role={interactive ? 'button' : undefined}
+      tabIndex={interactive ? 0 : undefined}
+      title={title || (disabled ? 'Presto disponibile' : undefined)}
+      aria-disabled={disabled || undefined}
       onKeyDown={(e) => {
-        if (!onClick) return;
+        if (!interactive) return;
         if (e.key === 'Enter' || e.key === ' ') {
           e.preventDefault();
           onClick();
@@ -24,10 +32,12 @@ function BrutRow({ icon: Icon, label, sublabel, right, onClick }) {
         display: 'flex', alignItems: 'center', gap: 14,
         padding: '14px 18px',
         borderBottom: '2px solid var(--b-black)',
-        background: 'var(--b-white)', cursor: onClick ? 'pointer' : 'default',
+        background: 'var(--b-white)',
+        cursor: disabled ? 'not-allowed' : (interactive ? 'pointer' : 'default'),
+        opacity: disabled ? 0.55 : 1,
         transition: 'background 0.1s',
       }}
-      onMouseEnter={e => { if (onClick) e.currentTarget.style.background = 'var(--b-cream)'; }}
+      onMouseEnter={e => { if (interactive) e.currentTarget.style.background = 'var(--b-cream)'; }}
       onMouseLeave={e => e.currentTarget.style.background = 'var(--b-white)'}
     >
       <div style={{ width: 36, height: 36, background: 'var(--b-yellow)', border: '2px solid var(--b-black)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
@@ -38,7 +48,7 @@ function BrutRow({ icon: Icon, label, sublabel, right, onClick }) {
         {sublabel && <div style={{ fontSize: '0.75rem', color: 'var(--b-gray)', fontWeight: 500 }}>{sublabel}</div>}
       </span>
       {right}
-      {onClick && !right && <ChevronRight size={16} strokeWidth={2.5} color="var(--b-gray)" />}
+      {interactive && !right && <ChevronRight size={16} strokeWidth={2.5} color="var(--b-gray)" />}
     </div>
   );
 }
@@ -65,19 +75,113 @@ function BrutToggle({ on, onClick }) {
   );
 }
 
-export default function StudentProfile({ email = 'student@scuola.edu.it' }) {
-  const { logoutStudent } = useAuth();
-  const savedProfile = getStudentProfile();
-  const { requireClass } = getSettings();
-  const [notifications, setNotifications] = useState(savedProfile.notifications);
-  const [defaultAnon, setDefaultAnon] = useState(savedProfile.defaultAnon);
-  const [isEditingProfile, setIsEditingProfile] = useState(false);
-  const [nome, setNome] = useState(savedProfile.nome);
-  const [cognome, setCognome] = useState(savedProfile.cognome);
-  const [classe, setClasse] = useState(savedProfile.classe);
-  const profileEmail = savedProfile.email || email;
+function sanitizeReportForExport(r) {
+  return {
+    id: r.id,
+    created_at: r.created_at || (r.createdAt ? new Date(r.createdAt).toISOString() : null),
+    type: r.type,
+    title: r.title,
+    content: r.content,
+    status: r.status,
+    is_public: r.is_public ?? r.isPublic ?? false,
+    is_anonymous: r.is_anonymous ?? r.isAnonymous ?? r.anonimo ?? false,
+    box_slug: r.box_slug || null,
+  };
+}
 
+export default function StudentProfile({ email = 'student@scuola.edu.it' }) {
+  const { slug } = useParams();
+  const navigate = useNavigate();
+  const isDemo = slug === 'demo';
+  const { logoutStudent, logoutReal, profile: supabaseProfile, refreshProfile, session } = useAuth();
+
+  const savedProfile = getStudentProfile();
+
+  // requireClass: demo = mockSettings, reale = impostazione della box su Supabase
+  const [requireClass, setRequireClass] = useState(isDemo ? getSettings().requireClass : false);
+  useEffect(() => {
+    if (isDemo) return;
+    getBox(slug)
+      .then(box => { if (box) setRequireClass(!!box.require_class); })
+      .catch(console.error);
+  }, [isDemo, slug]);
+
+  // Valori iniziali: demo = mockProfiles, reale = AuthContext.profile
+  const displayProfile = isDemo ? savedProfile : (supabaseProfile || savedProfile);
+
+  const [defaultAnon, setDefaultAnon] = useState(displayProfile.defaultAnon ?? displayProfile.default_anon ?? true);
+  const [notifPrefs, setNotifPrefs] = useState(displayProfile.notif_prefs || { push_enabled: false });
+  const [isEditingProfile, setIsEditingProfile] = useState(false);
+  const [nome, setNome] = useState(displayProfile.nome || '');
+  const [cognome, setCognome] = useState(displayProfile.cognome || '');
+  const [classe, setClasse] = useState(displayProfile.classe || '');
+  const [actionMsg, setActionMsg] = useState('');
+  const [actionOk, setActionOk] = useState(true);
+  const [busyExport, setBusyExport] = useState(false);
+
+  // Il profilo Supabase arriva in modo asincrono: sincronizza i campi
+  useEffect(() => {
+    if (isDemo || !supabaseProfile) return;
+    setNome(supabaseProfile.nome || '');
+    setCognome(supabaseProfile.cognome || '');
+    setClasse(supabaseProfile.classe || '');
+    setDefaultAnon(supabaseProfile.default_anon ?? true);
+    setNotifPrefs(supabaseProfile.notif_prefs || { push_enabled: false });
+  }, [isDemo, supabaseProfile]);
+
+  const profileEmail = displayProfile.email || supabaseProfile?.email || email;
   const initials = profileEmail.split('@')[0].slice(0, 2).toUpperCase();
+  const showVerifiedBadge = !isDemo && !!session;
+
+  const showAction = (msg, type = 'success') => {
+    setActionMsg(msg);
+    setActionOk(type !== 'error');
+    setTimeout(() => setActionMsg(''), 4000);
+  };
+
+  const handleExportMyData = async () => {
+    setBusyExport(true);
+    try {
+      let identified = [];
+      let anonymous = [];
+      if (isDemo) {
+        identified = getReports().filter((r) => r.mine);
+      } else {
+        [identified, anonymous] = await Promise.all([getMyReports(), getMyAnonReports()]);
+      }
+      const payload = {
+        exported_at: new Date().toISOString(),
+        box_slug: slug,
+        profile: {
+          email: profileEmail,
+          nome: nome.trim() || null,
+          cognome: cognome.trim() || null,
+          classe: requireClass ? (classe.trim() || null) : null,
+        },
+        reports: {
+          identified: identified.map(sanitizeReportForExport),
+          anonymous: anonymous.map(sanitizeReportForExport),
+        },
+      };
+      const stamp = new Date().toISOString().slice(0, 10);
+      downloadTextFile(
+        `dilloqui-miei-dati-${slug || 'export'}-${stamp}.json`,
+        JSON.stringify(payload, null, 2),
+        'application/json;charset=utf-8',
+      );
+      const total = payload.reports.identified.length + payload.reports.anonymous.length;
+      showAction(`Esportate ${total} segnalazioni.`);
+    } catch (err) {
+      console.error(err);
+      showAction(err?.message || 'Esportazione non riuscita.', 'error');
+    } finally {
+      setBusyExport(false);
+    }
+  };
+
+  const handleSupport = () => {
+    window.location.href = supportMailto({ slug, role: 'student' });
+  };
 
   if (isEditingProfile) {
     return (
@@ -110,12 +214,26 @@ export default function StudentProfile({ email = 'student@scuola.edu.it' }) {
           )}
           <button
             className="btn-primary"
-            onClick={() => {
-              patchStudentProfile({
-                nome: nome.trim(),
-                cognome: cognome.trim(),
-                classe: requireClass ? classe.trim() : '',
-              });
+            onClick={async () => {
+              if (isDemo) {
+                patchStudentProfile({
+                  nome: nome.trim(),
+                  cognome: cognome.trim(),
+                  classe: requireClass ? classe.trim() : '',
+                });
+              } else {
+                try {
+                  await updateMyProfile({
+                    nome: nome.trim(),
+                    cognome: cognome.trim(),
+                    classe: requireClass ? classe.trim() : '',
+                  });
+                  await refreshProfile(); // sincronizza il context con i nuovi dati
+                } catch (err) {
+                  console.error(err);
+                  return;
+                }
+              }
               setIsEditingProfile(false);
             }}
             id="profile-save-btn"
@@ -129,6 +247,27 @@ export default function StudentProfile({ email = 'student@scuola.edu.it' }) {
 
   return (
     <div style={{ maxWidth: 480, margin: '0 auto' }}>
+      {actionMsg && (
+        <div
+          role="status"
+          aria-live="polite"
+          style={{
+            marginBottom: 16,
+            padding: '12px 16px',
+            background: actionOk ? 'var(--b-yellow)' : 'var(--b-red)',
+            color: actionOk ? 'var(--b-black)' : '#FFFFFF',
+            border: '2px solid var(--b-black)',
+            boxShadow: 'var(--b-shadow-sm)',
+            fontSize: '0.82rem',
+            fontWeight: 800,
+            textTransform: 'uppercase',
+            letterSpacing: '0.04em',
+          }}
+        >
+          {actionOk ? '✓' : '✕'} {actionMsg}
+        </div>
+      )}
+
       {/* Avatar Card */}
       <div style={{
         background: 'var(--b-white)', border: '3px solid var(--b-black)',
@@ -148,7 +287,9 @@ export default function StudentProfile({ email = 'student@scuola.edu.it' }) {
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
           <BadgeCheck size={15} color="var(--b-blue)" strokeWidth={2.5} />
-          <span style={{ color: 'var(--b-blue)', fontWeight: 800, fontSize: '0.78rem', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Verificato</span>
+          <span style={{ color: 'var(--b-blue)', fontWeight: 800, fontSize: '0.78rem', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+            {showVerifiedBadge ? 'Verificato' : 'Account attivo'}
+          </span>
         </div>
         <div style={{ marginTop: 4, color: 'var(--b-black)', fontSize: '1.1rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
           {requireClass ? `${nome} ${cognome} • ${classe || '--'}` : `${nome} ${cognome}`}
@@ -159,25 +300,21 @@ export default function StudentProfile({ email = 'student@scuola.edu.it' }) {
       {/* Sezione Account */}
       <div style={{ fontSize: '0.68rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.09em', color: 'var(--b-gray)', marginBottom: 6, marginLeft: 2 }}>Account</div>
       <div style={{ border: '3px solid var(--b-black)', boxShadow: 'var(--b-shadow)', marginBottom: 20 }}>
-        <BrutRow icon={User} label="Dati Personali" onClick={() => setIsEditingProfile(true)} />
-        <BrutRow
-          icon={Bell}
-          label="Notifiche Push"
-          right={(
-            <BrutToggle
-              on={notifications}
-              onClick={() => {
-                const next = !notifications;
-                setNotifications(next);
-                patchStudentProfile({ notifications: next });
-              }}
-            />
-          )}
-        />
         <div style={{ borderBottom: 'none' }}>
-          <BrutRow icon={Globe} label="Lingua" right={<span style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--b-gray)', marginRight: 8 }}>Italiano</span>} onClick={() => { }} />
+          <BrutRow icon={User} label="Dati Personali" onClick={() => setIsEditingProfile(true)} />
         </div>
       </div>
+
+      <NotificationPrefs
+        role="student"
+        isDemo={isDemo}
+        prefs={isDemo ? notifPrefs : (supabaseProfile?.notif_prefs || notifPrefs)}
+        onPrefsChange={(next) => {
+          setNotifPrefs(next);
+          if (isDemo) patchStudentProfile({ notifications: next.push_enabled, notif_prefs: next });
+          else refreshProfile();
+        }}
+      />
 
       {/* Sezione Privacy */}
       <div style={{ fontSize: '0.68rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.09em', color: 'var(--b-gray)', marginBottom: 6, marginLeft: 2 }}>Privacy</div>
@@ -189,32 +326,51 @@ export default function StudentProfile({ email = 'student@scuola.edu.it' }) {
           right={(
             <BrutToggle
               on={defaultAnon}
-              onClick={() => {
+              onClick={async () => {
                 const next = !defaultAnon;
                 setDefaultAnon(next);
-                patchStudentProfile({ defaultAnon: next });
+                if (isDemo) {
+                  patchStudentProfile({ defaultAnon: next });
+                } else {
+                  try {
+                    await updateMyProfile({ default_anon: next });
+                    await refreshProfile();
+                  } catch (err) {
+                    console.error(err);
+                  }
+                }
               }}
             />
           )}
         />
         <div style={{ borderBottom: 'none' }}>
-          <BrutRow icon={Download} label="Esporta i miei dati" onClick={() => { }} />
+          <BrutRow
+            icon={Download}
+            label="Esporta i miei dati"
+            sublabel={busyExport ? 'Preparazione...' : 'JSON delle tue segnalazioni'}
+            onClick={busyExport ? undefined : handleExportMyData}
+          />
         </div>
       </div>
 
       {/* Sezione Info */}
       <div style={{ fontSize: '0.68rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.09em', color: 'var(--b-gray)', marginBottom: 6, marginLeft: 2 }}>Informazioni</div>
       <div style={{ border: '3px solid var(--b-black)', boxShadow: 'var(--b-shadow)', marginBottom: 24 }}>
-        <BrutRow icon={FileText} label="Regole dell'App" onClick={() => { }} />
-        <BrutRow icon={Lock} label="Informativa sulla Privacy" onClick={() => { }} />
+        <BrutRow
+          icon={ScrollText}
+          label="Regolamento dello sportello"
+          onClick={() => navigate(`/box/${slug}/regolamento`)}
+        />
+        <BrutRow icon={FileText} label="Regole dell'App" disabled title="Presto disponibile" />
+        <BrutRow icon={Lock} label="Informativa sulla Privacy" disabled title="Presto disponibile" />
         <div style={{ borderBottom: 'none' }}>
-          <BrutRow icon={HelpCircle} label="Supporto" onClick={() => { }} />
+          <BrutRow icon={HelpCircle} label="Supporto" onClick={handleSupport} />
         </div>
       </div>
 
       {/* Logout */}
       <button
-        onClick={logoutStudent}
+        onClick={() => (isDemo ? logoutStudent() : logoutReal())}
         style={{
           display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
           width: '100%', padding: '14px 24px',

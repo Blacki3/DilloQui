@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { FileText, Trash2, Edit3, Globe2, Lock, UserX, User, PlusCircle, Clock } from 'lucide-react';
-import { getAllDrafts, deleteDraft, formatDraftDate, countDrafts } from '../../services/draftStore';
+import { getAllDrafts, deleteDraft, formatDraftDate } from '../../services/draftStore';
 
 /* Icona incognito */
 function IncognitoIcon({ size = 24 }) {
@@ -37,13 +37,17 @@ const TYPE_LABEL = {
 export default function Drafts() {
   const { slug } = useParams();
   const navigate = useNavigate();
-  const [drafts, setDrafts] = useState(getAllDrafts());
+  const [drafts, setDrafts] = useState(() => getAllDrafts(slug));
   const [confirmDelete, setConfirmDelete] = useState(null);
 
-  const refresh = () => setDrafts(getAllDrafts());
+  useEffect(() => {
+    setDrafts(getAllDrafts(slug));
+  }, [slug]);
+
+  const refresh = () => setDrafts(getAllDrafts(slug));
 
   const handleDelete = (id) => {
-    deleteDraft(id);
+    deleteDraft(id, slug);
     setConfirmDelete(null);
     refresh();
   };

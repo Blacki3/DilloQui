@@ -13,3 +13,4 @@ export { default as MyReports } from '../pages/student/MyReports';
 export { default as StudentProfile } from '../pages/student/StudentProfile';
 export { default as Drafts } from '../pages/student/Drafts';
 export { default as Tendenze } from '../pages/student/Tendenze';
+export { default as Regolamento } from '../pages/student/Regolamento';

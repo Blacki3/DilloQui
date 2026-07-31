@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import { ChevronDown } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
-export default function Select({ value, onChange, options, placeholder = 'Seleziona...' }) {
+export default function Select({ value, onChange, options, placeholder = 'Seleziona...', error = false }) {
   const [isOpen, setIsOpen] = useState(false);
   const containerRef = useRef(null);
 
@@ -31,11 +31,16 @@ export default function Select({ value, onChange, options, placeholder = 'Selezi
       <button
         type="button"
         onClick={() => setIsOpen(!isOpen)}
+        aria-invalid={error || undefined}
+        className={error ? 'field-invalid' : undefined}
         style={{
           display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8,
-          width: '100%', padding: '12px 16px', background: isOpen ? 'var(--b-yellow)' : 'var(--b-white)',
-          border: 'var(--b-border)', borderRadius: 'var(--b-radius)',
-          boxShadow: '3px 3px 0 var(--b-black)', cursor: 'pointer', outline: 'none',
+          width: '100%', padding: '12px 16px',
+          background: error ? undefined : (isOpen ? 'var(--b-yellow)' : 'var(--b-white)'),
+          border: error ? undefined : 'var(--b-border)',
+          borderRadius: 'var(--b-radius)',
+          boxShadow: error ? undefined : '3px 3px 0 var(--b-black)',
+          cursor: 'pointer', outline: 'none',
           fontFamily: "'Space Grotesk', sans-serif", fontSize: '0.95rem',
           color: value ? 'var(--b-black)' : 'var(--b-gray)', transition: 'background 0.2s'
         }}

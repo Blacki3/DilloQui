@@ -1,18 +1,88 @@
 import { useState, useRef, useEffect } from 'react';
 import { Lock, Eye, CheckCircle2, X, Send, MessageSquare, ArrowLeft } from 'lucide-react';
-import { useReports, addMessage, setStatus, STATUS, STATUS_LABEL, STATUS_BADGE_CLASS } from '../../services/mockStore';
+import { useParams } from 'react-router-dom';
+import { useReports as useReportsMock, addMessage, setStatus as setStatusMock, STATUS, STATUS_LABEL, STATUS_BADGE_CLASS } from '../../services/mockStore';
+import {
+  getMyReports, getMyAnonReports, updateReport, updateAnonReportStatus,
+  sendChatMessage, getChatMessages, getAnonChatMessages, sendAnonChatMessage,
+} from '../../services/db';
+import { useAuth } from '../../context/AuthContext';
 
 const filterTabs = ['Tutte', 'In Lavorazione', 'Chiuse'];
 
 export default function MyReports() {
-  const reports = useReports()
-    .filter((item) => item.mine)
-    .sort((a, b) => b.createdAt - a.createdAt);
+  const { slug } = useParams();
+  const isDemo = slug === 'demo';
+  const { profile } = useAuth();
+
+  // ── Dati: demo usa mock, reale usa Supabase ────────────────────────────
+  const mockReports = useReportsMock().filter(r => r.mine).sort((a, b) => b.createdAt - a.createdAt);
+  const [realReports, setRealReports] = useState([]);
+  const [loadingReports, setLoadingReports] = useState(!isDemo);
+
+  useEffect(() => {
+    if (isDemo) return;
+    setLoadingReports(true);
+    // Carica sia le segnalazioni identificate che quelle anonime
+    // (le anonime vengono recuperate tramite i token salvati in localStorage)
+    Promise.all([getMyReports(), getMyAnonReports()])
+      .then(([identified, anonymous]) => {
+        const mapReport = (r) => ({
+          ...r,
+          createdAt: new Date(r.created_at).getTime(),
+          date: new Date(r.created_at).toLocaleDateString('it-IT', { day: 'numeric', month: 'short', year: 'numeric' }),
+          isPublic: r.is_public,
+          mine: true,
+          chat: [],                    // popolata all'apertura della conversazione
+          chatCount: r.chat_messages?.[0]?.count ?? 0,
+          anonToken: r.anon_token || null, // presente solo per le segnalazioni anonime
+        });
+        const merged = [...identified.map(mapReport), ...anonymous.map(mapReport)]
+          .sort((a, b) => b.createdAt - a.createdAt);
+        setRealReports(merged);
+      })
+      .catch(console.error)
+      .finally(() => setLoadingReports(false));
+  }, [isDemo]);
+
+  const reports = isDemo ? mockReports : realReports;
   const [activeFilter, setActiveFilter] = useState('Tutte');
   const [openChat, setOpenChat] = useState(null);
   const [chatInput, setChatInput] = useState('');
   const [confirmClose, setConfirmClose] = useState(null);
   const chatEndRef = useRef(null);
+
+  // Carica i messaggi della chat quando si apre una conversazione (solo reale)
+  useEffect(() => {
+    if (isDemo || !openChat) return;
+    const rep = realReports.find(r => r.id === openChat);
+    if (!rep) return;
+
+    const fetchMsgs = rep.anonToken
+      ? getAnonChatMessages(rep.id, rep.anonToken)
+      : getChatMessages(rep.id);
+
+    fetchMsgs
+      .then(msgs => {
+        const mapped = msgs.map(m => {
+          // Segnalazione anonima: i miei messaggi hanno anon_token, quelli admin author_id.
+          // Segnalazione identificata: i miei messaggi hanno il mio author_id.
+          const isAdmin = rep.anonToken ? !!m.author_id : m.author_id !== profile?.id;
+          return {
+            id: m.id,
+            text: m.content,
+            isAdmin,
+            author: isAdmin ? 'Sportello' : 'Tu',
+            time: new Date(m.created_at).toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' }),
+          };
+        });
+        setRealReports(prev => prev.map(r =>
+          r.id === openChat ? { ...r, chat: mapped, chatCount: mapped.length } : r
+        ));
+      })
+      .catch(console.error);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [openChat, isDemo]);
 
   const filtered = reports.filter(r => {
     if (activeFilter === 'Tutte') return true;
@@ -21,18 +91,55 @@ export default function MyReports() {
     return true;
   });
 
-  const markStatus = (id, newStatus) => {
-    setStatus(id, newStatus);
+  const markStatus = async (id, newStatus) => {
+    if (isDemo) {
+      setStatusMock(id, newStatus);
+    } else {
+      try {
+        const rep = realReports.find(r => r.id === id);
+        if (rep?.anonToken) {
+          // Segnalazione anonima: passa dal token (le RLS non riconoscono l'autore)
+          await updateAnonReportStatus(id, rep.anonToken, newStatus);
+        } else {
+          await updateReport(id, { status: newStatus });
+        }
+        setRealReports(prev => prev.map(r => r.id === id ? { ...r, status: newStatus } : r));
+      } catch (err) {
+        console.error(err);
+      }
+    }
     setConfirmClose(null);
   };
 
-  const sendChatMsg = (reportId) => {
+  const sendChatMsg = async (reportId) => {
     if (!chatInput.trim()) return;
-    addMessage(reportId, { text: chatInput.trim(), isAdmin: false, author: 'Tu' });
+    if (isDemo) {
+      addMessage(reportId, { text: chatInput.trim(), isAdmin: false, author: 'Tu' });
+    } else {
+      try {
+        const rep = realReports.find(r => r.id === reportId);
+        const saved = rep?.anonToken
+          ? await sendAnonChatMessage({ reportId, anonToken: rep.anonToken, content: chatInput.trim() })
+          : await sendChatMessage({ reportId, content: chatInput.trim() });
+        const newMsg = {
+          id: saved.id,
+          text: saved.content,
+          isAdmin: false,
+          author: 'Tu',
+          time: new Date(saved.created_at).toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' }),
+        };
+        setRealReports(prev => prev.map(r =>
+          r.id === reportId
+            ? { ...r, chat: [...(r.chat || []), newMsg], chatCount: (r.chatCount ?? 0) + 1 }
+            : r
+        ));
+      } catch (err) {
+        console.error(err);
+        return;
+      }
+    }
     setChatInput('');
-    setTimeout(() => {
-      chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-    }, 100);
+    setTimeout(() => { chatEndRef.current?.scrollIntoView({ behavior: 'smooth' }); }, 100);
   };
 
   const openReport = reports.find(r => r.id === openChat);
@@ -195,11 +302,55 @@ export default function MyReports() {
         ))}
       </div>
 
+      {loadingReports ? (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          {[0, 1, 2].map((i) => (
+            <div
+              key={i}
+              className="flat-panel"
+              style={{
+                minHeight: 96,
+                background: i % 2 === 0 ? 'var(--b-white)' : 'var(--b-cream)',
+                opacity: 0.7,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: 'var(--b-gray)',
+                fontWeight: 800,
+                fontSize: '0.82rem',
+                textTransform: 'uppercase',
+                letterSpacing: '0.04em',
+              }}
+            >
+              {i === 0 ? 'Caricamento segnalazioni…' : ''}
+            </div>
+          ))}
+        </div>
+      ) : filtered.length === 0 ? (
+        <div
+          className="flat-panel"
+          style={{
+            textAlign: 'center',
+            padding: '36px 24px',
+            color: 'var(--b-gray)',
+            fontWeight: 700,
+            fontSize: '0.9rem',
+          }}
+        >
+          {reports.length === 0
+            ? 'Non hai ancora inviato segnalazioni.'
+            : `Nessuna segnalazione in “${activeFilter}”.`}
+        </div>
+      ) : (
       <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
         {filtered.map(report => {
           const statusClass = STATUS_BADGE_CLASS[report.status] || 'badge badge-status-new';
           const statusLabel = STATUS_LABEL[report.status] || report.status;
-          const latestAdminReply = [...report.chat].reverse().find((msg) => msg.isAdmin);
+          // In reale la chat non è precaricata: niente anteprima vuota, solo conteggio
+          const latestAdminReply = isDemo
+            ? [...(report.chat || [])].reverse().find((msg) => msg.isAdmin)
+            : null;
+          const chatCount = report.chatCount ?? report.chat?.length ?? 0;
           return (
             <div
               key={report.id}
@@ -238,13 +389,14 @@ export default function MyReports() {
                 </div>
               )}
               <div style={{ marginTop: 12, display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.78rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                <MessageSquare size={13} strokeWidth={2.5} /> Apri conversazione ({report.chat.length})
+                <MessageSquare size={13} strokeWidth={2.5} /> Apri conversazione ({chatCount})
                 <span style={{ marginLeft: 'auto', color: 'var(--b-black)' }}>→</span>
               </div>
             </div>
           );
         })}
       </div>
+      )}
     </div>
   );
 }

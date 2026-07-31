@@ -1,8 +1,9 @@
 import { useState, useRef, useEffect } from 'react';
 import { ThumbsUp, ThumbsDown, MessageSquare, ArrowRight, PlusCircle, Search, Filter, ArrowUpDown, X } from 'lucide-react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { useReports, voteReport, displayAuthor, getTypeLabel, getTypeBadgeClass } from '../../services/mockStore';
+import { useReports as useReportsMock, voteReport as voteReportMock, displayAuthor, getTypeLabel, getTypeBadgeClass, typesMatch, canonicalTypeKey, slugifyType, TYPE_LABEL } from '../../services/mockStore';
 import { motion, AnimatePresence } from 'framer-motion';
+import { getPublicReports, toggleVote } from '../../services/db';
 
 function CustomDropdown({ value, options, onChange, icon: Icon, activeCondition }) {
   const [isOpen, setIsOpen] = useState(false);
@@ -206,15 +207,85 @@ function MultiSelectDropdown({ selected, options, onChange, icon: Icon }) {
 }
 
 export default function Forum() {
+  const { slug } = useParams();
+  const isDemo = slug === 'demo';
   const [search, setSearch] = useState('');
   const [filterTypes, setFilterTypes] = useState([]); // array vuoto = tutte
   const [sortOrder, setSortOrder] = useState('recent'); // recent, popular
 
-  const allPosts = useReports().filter((item) => item.isPublic);
+  // ── Dati: demo usa mock, reale usa Supabase ────────────────────────────
+  const mockPosts = useReportsMock().filter(r => r.isPublic);
+  const [realPosts, setRealPosts] = useState([]);
+  const [loadingPosts, setLoadingPosts] = useState(!isDemo);
+
+  useEffect(() => {
+    if (isDemo) return;
+    setLoadingPosts(true);
+    getPublicReports(slug)
+      .then(data => {
+        setRealPosts(data.map(r => ({
+          ...r,
+          createdAt: new Date(r.created_at).getTime(),
+          time: new Date(r.created_at).toLocaleString('it-IT', {
+            day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit',
+          }),
+          isPublic: r.is_public,
+          anonimo: r.is_anonymous,
+          likes: r.votes?.[0]?.count || 0,
+          commentsCount: r.comments?.[0]?.count || 0,
+          authorName: r.authorName,               // dalla RPC (NULL se anonimo)
+          authorClass: r.authorClass || '—',
+        })));
+      })
+      .catch(console.error)
+      .finally(() => setLoadingPosts(false));
+  }, [isDemo, slug]);
+
+  const handleVote = async (e, reportId, value) => {
+    e.stopPropagation();
+    if (isDemo) {
+      voteReportMock(reportId, value);
+    } else {
+      try {
+        const res = await toggleVote(reportId);
+        setRealPosts(prev => prev.map(r =>
+          r.id === reportId
+            ? {
+                ...r,
+                likes: Math.max(0, (r.likes || 0) + (res.voted ? 1 : -1)),
+                voted: res.voted,
+                userVote: res.voted ? 1 : 0,
+              }
+            : r
+        ));
+      } catch (err) { console.error(err); }
+    }
+  };
+
+  const allPosts = isDemo ? mockPosts : realPosts;
+
+  // Opzioni filtro: canoniche + tipi custom presenti nei post (es. Bullismo)
+  const categoryFilterOptions = (() => {
+    const opts = [
+      { value: 'problema', label: 'Problemi' },
+      { value: 'proposta', label: 'Proposte' },
+      { value: 'dubbio', label: 'Dubbi' },
+    ];
+    const seen = new Set(['problema', 'proposta', 'dubbio']);
+    for (const post of allPosts) {
+      const canon = canonicalTypeKey(post.type);
+      if (TYPE_LABEL[canon]) continue;
+      const key = slugifyType(post.type);
+      if (!key || seen.has(key)) continue;
+      seen.add(key);
+      opts.push({ value: key, label: getTypeLabel(post.type) });
+    }
+    return opts;
+  })();
 
   const posts = allPosts
     .filter(post => {
-      if (filterTypes.length > 0 && !filterTypes.includes(post.type)) return false;
+      if (filterTypes.length > 0 && !filterTypes.some((ft) => typesMatch(post.type, ft))) return false;
       if (search.trim()) {
         const query = search.toLowerCase();
         return post.title.toLowerCase().includes(query) || post.content.toLowerCase().includes(query);
@@ -232,12 +303,6 @@ export default function Forum() {
     });
 
   const navigate = useNavigate();
-  const { slug } = useParams();
-
-  const handleVote = (e, postId, value) => {
-    e.stopPropagation();
-    voteReport(postId, value);
-  };
 
   return (
     <div>
@@ -293,11 +358,7 @@ export default function Forum() {
         {/* Categories Select */}
         <MultiSelectDropdown
           selected={filterTypes}
-          options={[
-            { value: 'problema', label: 'Problemi' },
-            { value: 'proposta', label: 'Proposte' },
-            { value: 'dubbio', label: 'Dubbi' }
-          ]}
+          options={categoryFilterOptions}
           onChange={setFilterTypes}
           icon={Filter}
         />
@@ -318,10 +379,36 @@ export default function Forum() {
 
       {/* Post list */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-        {posts.map(post => {
+        {loadingPosts ? (
+          <div style={{
+            padding: 40, textAlign: 'center', border: '3px solid var(--b-black)',
+            background: 'var(--b-white)', boxShadow: 'var(--b-shadow-sm)',
+            fontWeight: 700, color: 'var(--b-gray)',
+          }}>
+            Caricamento bacheca...
+          </div>
+        ) : posts.length === 0 ? (
+          <div style={{
+            padding: 40, textAlign: 'center', border: '3px solid var(--b-black)',
+            background: 'var(--b-white)', boxShadow: 'var(--b-shadow-sm)',
+          }}>
+            <p style={{ fontWeight: 800, fontSize: '1.05rem', marginBottom: 8, textTransform: 'uppercase' }}>
+              {allPosts.length === 0 ? 'Nessun post ancora' : 'Nessun risultato'}
+            </p>
+            <p style={{ color: 'var(--b-gray)', fontSize: '0.9rem', margin: 0, fontWeight: 600 }}>
+              {allPosts.length === 0
+                ? 'Quando qualcuno pubblicherà una segnalazione pubblica, la troverai qui.'
+                : 'Nessuna segnalazione corrisponde ai filtri o alla ricerca.'}
+            </p>
+          </div>
+        ) : (
+        posts.map(post => {
           const typeLabel = getTypeLabel(post.type);
           const badgeClass = getTypeBadgeClass(post.type);
-          const stripeStyle = post.type ? { background: `var(--b-${post.type === 'problema' ? 'red' : post.type === 'proposta' ? 'blue' : 'orange'})` } : { background: 'var(--b-gray)' };
+          const canon = canonicalTypeKey(post.type);
+          const stripeStyle = {
+            background: `var(--b-${canon === 'problema' ? 'red' : canon === 'proposta' ? 'blue' : canon === 'dubbio' ? 'orange' : 'gray'})`,
+          };
           return (
             <div
               key={post.id}
@@ -341,7 +428,7 @@ export default function Forum() {
               {/* Stripe categoria */}
               <div className="forum-cat-stripe" style={stripeStyle} />
 
-              {/* Colonna voti */}
+              {/* Colonna voti — in reale solo like (DB toggle), in demo up/down */}
               <div className="forum-vote-col">
                 <button
                   className={`vote-btn vote-btn-up ${post.userVote === 1 ? 'active' : ''}`}
@@ -362,24 +449,26 @@ export default function Forum() {
                   </motion.div>
                 </button>
                 <span className="vote-count">{Math.max(0, post.likes)}</span>
-                <button
-                  className={`vote-btn vote-btn-down ${post.userVote === -1 ? 'active' : ''}`}
-                  onClick={(e) => handleVote(e, post.id, -1)}
-                  aria-label={`Vota negativamente ${post.title}`}
-                  id={`vote-down-${post.id}`}
-                >
-                  <motion.div
-                    initial={false}
-                    whileTap={{ scale: 0.7, rotate: 25 }}
-                    animate={{
-                      rotate: post.userVote === -1 ? 15 : 0,
-                      scale: post.userVote === -1 ? 1.15 : 1
-                    }}
-                    transition={{ type: "spring", stiffness: 400, damping: 10 }}
+                {isDemo && (
+                  <button
+                    className={`vote-btn vote-btn-down ${post.userVote === -1 ? 'active' : ''}`}
+                    onClick={(e) => handleVote(e, post.id, -1)}
+                    aria-label={`Vota negativamente ${post.title}`}
+                    id={`vote-down-${post.id}`}
                   >
-                    <ThumbsDown size={16} strokeWidth={2.5} />
-                  </motion.div>
-                </button>
+                    <motion.div
+                      initial={false}
+                      whileTap={{ scale: 0.7, rotate: 25 }}
+                      animate={{
+                        rotate: post.userVote === -1 ? 15 : 0,
+                        scale: post.userVote === -1 ? 1.15 : 1
+                      }}
+                      transition={{ type: "spring", stiffness: 400, damping: 10 }}
+                    >
+                      <ThumbsDown size={16} strokeWidth={2.5} />
+                    </motion.div>
+                  </button>
+                )}
               </div>
 
               {/* Contenuto */}
@@ -393,7 +482,7 @@ export default function Forum() {
                 <div className="forum-post-body">{post.content}</div>
                 <div className="forum-post-footer">
                   <MessageSquare size={14} strokeWidth={2.5} />
-                  {post.comments.length} Commenti
+                  {post.commentsCount ?? post.comments?.length ?? 0} Commenti
                   <span className="forum-read-more" style={{ marginLeft: 'auto', color: 'var(--b-black)', fontWeight: 800 }}>
                     Leggi <ArrowRight className="read-more-icon" size={12} strokeWidth={3} style={{ display: 'inline', verticalAlign: 'middle' }} />
                   </span>
@@ -401,7 +490,8 @@ export default function Forum() {
               </div>
             </div>
           );
-        })}
+        })
+        )}
       </div>
     </div>
   );

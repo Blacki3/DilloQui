@@ -4,27 +4,37 @@ import {
   Inbox, FilterX, ArrowDownUp, Globe, Lock, Users, ChevronLeft, ThumbsUp,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useLocation } from 'react-router-dom';
+import { useAuth } from '../../context/AuthContext';
 import { getSettings } from '../../services/mockSettings';
 import {
-  useReports,
+  useReports as useReportsMock,
   useAdminReadVersion,
   addMessage,
-  setStatus,
+  setStatus as setStatusMock,
   markReportRead,
   hasUnreadForAdmin,
   needsAdminAttention,
   displayAuthor,
   getTypeBadgeClass,
   getTypeLabel,
+  typesMatch,
   STATUS,
   STATUS_LABEL,
   STATUS_BADGE_CLASS,
   TYPE_LABEL,
 } from '../../services/mockStore';
+import {
+  markReportReadReal,
+  hasUnreadReal,
+  needsAttentionReal,
+  useAdminReadVersionReal,
+} from '../../services/adminReadStore';
+import { getAllReports, updateReport, sendChatMessage, getChatMessages } from '../../services/db';
 
 const STATUS_TABS = [
   { value: 'all', label: 'Tutte' },
-  { value: STATUS.new, label: 'Aperta / Nuove' },
+  { value: STATUS.new, label: STATUS_LABEL[STATUS.new] },
   { value: STATUS.in_review, label: STATUS_LABEL[STATUS.in_review] },
   { value: STATUS.resolved, label: STATUS_LABEL[STATUS.resolved] },
   { value: STATUS.closed, label: STATUS_LABEL[STATUS.closed] },
@@ -63,13 +73,7 @@ function readDesktopFiltersOpen() {
 
 function matchesType(report, typeFilter) {
   if (typeFilter === 'all') return true;
-  const filterKey = String(typeFilter).toLowerCase();
-  const reportType = String(report.type).toLowerCase();
-  if (reportType === filterKey) return true;
-  if (getTypeLabel(report.type).toLowerCase() === filterKey) return true;
-  const settingsMatch = getSettings().categories.find((c) => c.toLowerCase() === filterKey);
-  if (settingsMatch && getTypeLabel(report.type).toLowerCase() === settingsMatch.toLowerCase()) return true;
-  return false;
+  return typesMatch(report.type, typeFilter);
 }
 
 function buildCategoryFilters(reports) {
@@ -85,9 +89,7 @@ function buildCategoryFilters(reports) {
   for (const category of settingsCategories) {
     const key = category.toLowerCase();
     if (seen.has(key)) continue;
-    const appearsInReports = reports.some(
-      (r) => String(r.type).toLowerCase() === key || getTypeLabel(r.type).toLowerCase() === key,
-    );
+    const appearsInReports = reports.some((r) => typesMatch(r.type, category) || typesMatch(r.type, key));
     if (appearsInReports) {
       chips.push({ value: key, label: category });
       seen.add(key);
@@ -104,13 +106,13 @@ function buildCategoryFilters(reports) {
   return chips;
 }
 
-function applySharedFilters(report, typeFilter, visibilityFilter, soloNonGestite, readTick = 0) {
+function applySharedFilters(report, typeFilter, visibilityFilter, soloNonGestite, readTick = 0, attentionCheck = needsAdminAttention) {
   void readTick;
   const matchType = matchesType(report, typeFilter);
   const matchVisibility =
     visibilityFilter === 'all' ||
     (visibilityFilter === 'public' ? !!report.isPublic : !report.isPublic);
-  const matchAttention = !soloNonGestite || needsAdminAttention(report);
+  const matchAttention = !soloNonGestite || attentionCheck(report);
   return matchType && matchVisibility && matchAttention;
 }
 
@@ -395,10 +397,10 @@ function ReportDetailView({
             'Conversazione privata'
           )}
         </div>
-        {report.chat.length === 0 && (
+        {(!report.chat || report.chat.length === 0) && (
           <p style={{ color: 'var(--b-gray)', fontSize: '0.875rem' }}>Nessun messaggio.</p>
         )}
-        {report.chat.map(msg => (
+        {(report.chat || []).map(msg => (
           <div key={msg.id} style={{ marginBottom: 14, display: 'flex', gap: 10 }}>
             {!msg.isAdmin ? (
               <div style={{ width: 34, height: 34, background: 'var(--b-cream)', border: '2px solid var(--b-black)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
@@ -473,8 +475,55 @@ function ReportDetailView({
 }
 
 export default function ReportsList() {
-  const reports = useReports();
-  const readVersion = useAdminReadVersion();
+  const location = useLocation();
+  const { profile } = useAuth();
+  const isDemo = location.pathname.startsWith('/demo/admin');
+  const boxSlug = isDemo ? 'demo' : profile?.box_slug;
+  const adminId = profile?.id || '';
+
+  // ── Dati: demo usa mock, reale usa Supabase ────────────────────────────
+  const mockReports = useReportsMock();
+  const [realReports, setRealReports] = useState([]);
+  const [loadingReports, setLoadingReports] = useState(!isDemo);
+
+  useEffect(() => {
+    if (isDemo || !boxSlug) return;
+    setLoadingReports(true);
+    getAllReports(boxSlug)
+      .then(data => {
+        // Normalizza Supabase → formato atteso dalla UI
+        setRealReports(data.map(r => ({
+          ...r,
+          createdAt: new Date(r.created_at).getTime(),
+          date: new Date(r.created_at).toLocaleDateString('it-IT', {
+            day: 'numeric', month: 'short', year: 'numeric',
+          }),
+          isPublic: r.is_public,
+          isAnonymous: r.is_anonymous,
+          anonimo: r.is_anonymous,
+          authorName: r.is_anonymous
+            ? null
+            : (r.profiles?.nome ? `${r.profiles.nome} ${r.profiles.cognome || ''}`.trim() : null),
+          authorClass: r.is_anonymous ? null : (r.profiles?.classe || null),
+          likes: r.votes?.[0]?.count || 0,
+          comments: [],
+          chat: [], // popolata all'apertura del dettaglio
+        })));
+      })
+      .catch(console.error)
+      .finally(() => setLoadingReports(false));
+  }, [isDemo, boxSlug]);
+
+  const reports = isDemo ? mockReports : realReports;
+  const demoReadVersion = useAdminReadVersion();
+  const realReadVersion = useAdminReadVersionReal();
+  const readVersion = isDemo ? demoReadVersion : realReadVersion;
+
+  const checkUnread = (report) =>
+    isDemo ? hasUnreadForAdmin(report) : hasUnreadReal(report, adminId);
+  const checkAttention = (report) =>
+    isDemo ? needsAdminAttention(report) : needsAttentionReal(report, adminId);
+
   const [search, setSearch] = useState('');
   const [openChat, setOpenChat] = useState(null);
   const [chatInput, setChatInput] = useState('');
@@ -490,8 +539,10 @@ export default function ReportsList() {
   const categoryFilters = useMemo(() => buildCategoryFilters(reports), [reports]);
 
   const unreadTabCounts = useMemo(() => {
-    const base = reports.filter((r) => applySharedFilters(r, typeFilter, visibilityFilter, soloNonGestite, readVersion));
-    const countUnread = (list) => list.filter(hasUnreadForAdmin).length;
+    const base = reports.filter((r) =>
+      applySharedFilters(r, typeFilter, visibilityFilter, soloNonGestite, readVersion, checkAttention),
+    );
+    const countUnread = (list) => list.filter(checkUnread).length;
     return {
       all: countUnread(base),
       [STATUS.new]: countUnread(base.filter((r) => r.status === STATUS.new)),
@@ -499,7 +550,7 @@ export default function ReportsList() {
       [STATUS.resolved]: countUnread(base.filter((r) => r.status === STATUS.resolved)),
       [STATUS.closed]: countUnread(base.filter((r) => r.status === STATUS.closed)),
     };
-  }, [reports, typeFilter, visibilityFilter, soloNonGestite, readVersion]);
+  }, [reports, typeFilter, visibilityFilter, soloNonGestite, readVersion, isDemo, adminId]);
 
   const filtersActive =
     statusFilter !== 'all' ||
@@ -524,10 +575,12 @@ export default function ReportsList() {
         r.title.toLowerCase().includes(q) ||
         displayAuthor(r).toLowerCase().includes(q);
       const matchStatus = statusFilter === 'all' || r.status === statusFilter;
-      return matchSearch && matchStatus && applySharedFilters(r, typeFilter, visibilityFilter, soloNonGestite, readVersion);
+      return matchSearch && matchStatus && applySharedFilters(
+        r, typeFilter, visibilityFilter, soloNonGestite, readVersion, checkAttention,
+      );
     });
     return sortReports(list, sortBy);
-  }, [reports, search, statusFilter, typeFilter, visibilityFilter, soloNonGestite, sortBy, readVersion]);
+  }, [reports, search, statusFilter, typeFilter, visibilityFilter, soloNonGestite, sortBy, readVersion, isDemo, adminId]);
 
   const openReport = reports.find((r) => r.id === openChat);
   const isWide = useMediaQuery('(min-width: 1280px)');
@@ -551,11 +604,40 @@ export default function ReportsList() {
   };
 
   useEffect(() => {
-    if (openChat) {
-      markReportRead(openChat);
-      setConfirmAction(null);
-    }
-  }, [openChat]);
+    if (!openChat) return;
+    if (isDemo) markReportRead(openChat);
+    else if (adminId) markReportReadReal(adminId, openChat);
+    setConfirmAction(null);
+  }, [openChat, isDemo, adminId]);
+
+  // Carica chat reale all'apertura del dettaglio
+  useEffect(() => {
+    if (isDemo || !openChat) return;
+    getChatMessages(openChat)
+      .then((msgs) => {
+        const mapped = msgs.map((m) => {
+          const isAdmin = m.profiles?.role === 'admin';
+          const fullName = `${m.profiles?.nome || ''} ${m.profiles?.cognome || ''}`.trim();
+          const createdAt = new Date(m.created_at).getTime();
+          return {
+            id: m.id,
+            text: m.content,
+            isAdmin,
+            author: isAdmin ? (fullName || 'Admin') : (fullName || 'Studente'),
+            createdAt,
+            time: new Date(m.created_at).toLocaleTimeString('it-IT', {
+              hour: '2-digit', minute: '2-digit',
+            }),
+          };
+        });
+        setRealReports((prev) =>
+          prev.map((r) => (r.id === openChat ? { ...r, chat: mapped } : r)),
+        );
+        // Rileggi dopo il load chat così messaggi studente precedenti non restano "unread"
+        if (adminId) markReportReadReal(adminId, openChat);
+      })
+      .catch(console.error);
+  }, [openChat, isDemo, adminId]);
 
   useEffect(() => {
     try {
@@ -565,21 +647,78 @@ export default function ReportsList() {
     }
   }, [showDesktopFilters]);
 
-  const sendChatMsg = (reportId) => {
+  const sendChatMsg = async (reportId) => {
     if (!chatInput.trim()) return;
-    addMessage(reportId, { text: chatInput.trim(), isAdmin: true, author: 'Admin' });
+    if (isDemo) {
+      addMessage(reportId, { text: chatInput.trim(), isAdmin: true, author: 'Admin' });
+    } else {
+      try {
+        const report = realReports.find((r) => r.id === reportId);
+        const saved = await sendChatMessage({ reportId, content: chatInput.trim() });
+        const newMsg = {
+          id: saved.id,
+          text: saved.content,
+          isAdmin: true,
+          author: 'Admin',
+          createdAt: new Date(saved.created_at).getTime(),
+          time: new Date(saved.created_at).toLocaleTimeString('it-IT', {
+            hour: '2-digit', minute: '2-digit',
+          }),
+        };
+
+        // Come in demo: primo messaggio admin su segnalazione "new" → in_review
+        let nextStatus = report?.status;
+        if (report?.status === STATUS.new) {
+          await updateReport(reportId, { status: STATUS.in_review });
+          nextStatus = STATUS.in_review;
+        }
+
+        setRealReports((prev) =>
+          prev.map((r) =>
+            r.id === reportId
+              ? {
+                  ...r,
+                  chat: [...(r.chat || []), newMsg],
+                  ...(nextStatus ? { status: nextStatus } : {}),
+                }
+              : r,
+          ),
+        );
+      } catch (err) {
+        console.error(err);
+        return;
+      }
+    }
     setChatInput('');
   };
 
-  const applyStatus = (reportId, status) => {
-    setStatus(reportId, status);
+  const applyStatus = async (reportId, status) => {
+    if (isDemo) {
+      setStatusMock(reportId, status);
+    } else {
+      try {
+        await updateReport(reportId, { status });
+        setRealReports(prev => prev.map(r => r.id === reportId ? { ...r, status } : r));
+      } catch (err) {
+        console.error(err);
+      }
+    }
     setConfirmAction(null);
   };
 
-  const handleQuickStatus = (e, reportId, status) => {
+  const handleQuickStatus = async (e, reportId, status) => {
     e.stopPropagation();
     e.preventDefault();
-    setStatus(reportId, status);
+    if (isDemo) {
+      setStatusMock(reportId, status);
+    } else {
+      try {
+        await updateReport(reportId, { status });
+        setRealReports(prev => prev.map(r => r.id === reportId ? { ...r, status } : r));
+      } catch (err) {
+        console.error(err);
+      }
+    }
   };
 
   const openReportDetail = (reportId) => {
@@ -767,7 +906,7 @@ export default function ReportsList() {
           const typeClass = getTypeBadgeClass(report.type);
           const statusLabel = STATUS_LABEL[report.status] || report.status;
           const typeLabel = getTypeLabel(report.type);
-          const unread = hasUnreadForAdmin(report);
+          const unread = checkUnread(report);
           const showResolve = report.status !== STATUS.resolved && report.status !== STATUS.closed;
           const showClose = report.status !== STATUS.closed;
           return (

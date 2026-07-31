@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import Popup from '../../components/Popup';
 import Select from '../../components/Select';
 import { Send, Lock, Globe2, UserX, User, ArrowRight, Shield, BookMarked, Archive } from 'lucide-react';
@@ -7,6 +7,24 @@ import { addReport } from '../../services/mockStore';
 import { getSettings } from '../../services/mockSettings';
 import { getStudentProfile } from '../../services/mockProfiles';
 import { saveDraft, getDraftById, deleteDraft, countDrafts } from '../../services/draftStore';
+import { createReport, getBox } from '../../services/db';
+import { useAuth } from '../../context/AuthContext';
+import { friendlyError } from '../../utils/friendlyError';
+import { slugifyType, TYPE_LABEL } from '../../services/mockStore';
+
+/** Conserva etichette custom; normalizza solo le frasi default tipo "Un problema". */
+function resolveStoredType(tipo, fallback = 'problema') {
+  const s = slugifyType(tipo || fallback);
+  if (!s) return 'problema';
+  if (TYPE_LABEL[s]) return s;
+  if (/^un[ao]?\s+problema$/.test(s) || s === 'problemi') return 'problema';
+  if (/^un[ao]?\s+proposta$/.test(s) || s === 'proposte') return 'proposta';
+  if (/^un[ao]?\s+dubbio$/.test(s) || s === 'dubbi') return 'dubbio';
+  return s;
+}
+
+const TITLE_MIN = 5;
+const DESC_MIN = 20;
 
 /* Icona incognito da public/incognito-svgrepo-com.svg */
 function IncognitoIcon({ size = 24 }) {
@@ -35,70 +53,153 @@ function IncognitoIcon({ size = 24 }) {
 
 export default function NewReport() {
   const { slug } = useParams();
+  const isDemo = slug === 'demo';
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const draftId = searchParams.get('draftId');
+  const { profile } = useAuth();
 
   const settings = getSettings();
   const studentProfile = getStudentProfile();
-  const categoryOptions = settings.categories.length ? settings.categories : ['Un problema', 'Una proposta', 'Un dubbio'];
+
+  // Categorie: mock per demo, Supabase per reale
+  const [categoryOptions, setCategoryOptions] = useState(
+    isDemo ? (settings.categories.length ? settings.categories : ['Un problema', 'Una proposta', 'Un dubbio']) : []
+  );
+
+  useEffect(() => {
+    if (isDemo) return;
+    getBox(slug).then(box => {
+      if (box?.categories?.length) setCategoryOptions(box.categories);
+      else setCategoryOptions(['Un problema', 'Una proposta', 'Un dubbio']);
+    }).catch(console.error);
+  }, [isDemo, slug]);
 
   // Carica bozza se c'è un draftId nell'URL
-  const existingDraft = draftId ? getDraftById(draftId) : null;
+  const existingDraft = draftId ? getDraftById(draftId, slug) : null;
+
+  const defaultAnon = isDemo ? studentProfile.defaultAnon : (profile?.default_anon ?? true);
 
   const [isPublic, setIsPublic] = useState(existingDraft?.isPublic ?? false);
-  const [anonimo, setAnonimo] = useState(existingDraft?.anonimo ?? studentProfile.defaultAnon);
+  const [anonimo, setAnonimo] = useState(existingDraft?.anonimo ?? defaultAnon);
   const [titolo, setTitolo] = useState(existingDraft?.titolo || '');
   const [tipo, setTipo] = useState(existingDraft?.tipo || '');
   const [problema, setProblema] = useState(existingDraft?.problema || '');
   const [loading, setLoading] = useState(false);
   const [showPopup, setShowPopup] = useState(false);
   const [draftFeedback, setDraftFeedback] = useState(''); // '' | 'saved'
-  const [error, setError] = useState('');
+  const [fieldErrors, setFieldErrors] = useState({});
+  const [shakeToken, setShakeToken] = useState(0);
+  const [submitError, setSubmitError] = useState('');
 
-  const totalDrafts = countDrafts();
+  const titleRef = useRef(null);
+  const tipoRef = useRef(null);
+  const descRef = useRef(null);
+
+  const totalDrafts = countDrafts(slug);
+
+  const clearFieldError = (key) => {
+    setFieldErrors((prev) => {
+      if (!prev[key]) return prev;
+      const next = { ...prev };
+      delete next[key];
+      return next;
+    });
+  };
+
+  const validate = () => {
+    const next = {};
+    if (titolo.trim().length < TITLE_MIN) {
+      next.titolo = `Almeno ${TITLE_MIN} caratteri (ora ${titolo.trim().length}).`;
+    }
+    if (!tipo || !categoryOptions.includes(tipo)) {
+      next.tipo = 'Seleziona una categoria.';
+    }
+    if (problema.trim().length < DESC_MIN) {
+      next.problema = `Almeno ${DESC_MIN} caratteri (ora ${problema.trim().length}).`;
+    }
+    return next;
+  };
+
+  const focusFirstError = (errors) => {
+    const order = [
+      ['titolo', titleRef],
+      ['tipo', tipoRef],
+      ['problema', descRef],
+    ];
+    for (const [key, ref] of order) {
+      if (errors[key] && ref.current) {
+        ref.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        const focusable = ref.current.querySelector?.('input, textarea, button') || ref.current;
+        if (typeof focusable.focus === 'function') {
+          setTimeout(() => focusable.focus({ preventScroll: true }), 280);
+        }
+        break;
+      }
+    }
+  };
 
   const handleSaveDraft = () => {
-    saveDraft({ id: draftId || undefined, titolo, tipo, problema, isPublic, anonimo });
+    saveDraft({ id: draftId || undefined, titolo, tipo, problema, isPublic, anonimo, boxSlug: slug });
     setDraftFeedback('saved');
     setTimeout(() => setDraftFeedback(''), 2000);
   };
 
   const handleInvia = async (e) => {
     e.preventDefault();
-    if (titolo.trim().length < 5) {
-      setError('Il titolo deve contenere almeno 5 caratteri.');
-      return;
-    }
-    if (problema.trim().length < 20) {
-      setError('La descrizione deve contenere almeno 20 caratteri.');
-      return;
-    }
-    if (!tipo && !categoryOptions.includes(tipo)) {
-      setError('Seleziona una categoria valida.');
+    const errors = validate();
+    if (Object.keys(errors).length > 0) {
+      setFieldErrors(errors);
+      setShakeToken((t) => t + 1);
+      setSubmitError('');
+      // Aspetta un frame così le classi error/shake sono applicate prima dello scroll
+      requestAnimationFrame(() => focusFirstError(errors));
       return;
     }
 
-    setError('');
+    setFieldErrors({});
+    setSubmitError('');
     setLoading(true);
-    setTimeout(() => {
-      addReport({
-        type: (tipo || categoryOptions[0] || 'Problema').toLowerCase(),
-        title: titolo.trim(),
-        content: problema.trim(),
-        isPublic,
-        anonimo,
-        authorName: `${studentProfile.nome} ${studentProfile.cognome}`.trim() || 'Tu',
-      });
-      // Elimina la bozza se era una bozza in modifica
-      if (draftId) deleteDraft(draftId);
-      setLoading(false);
+
+    try {
+      if (isDemo) {
+        // DEMO: salva su mockStore
+        await new Promise(r => setTimeout(r, 1000));
+        addReport({
+          type: resolveStoredType(tipo, categoryOptions[0]),
+          title: titolo.trim(),
+          content: problema.trim(),
+          isPublic,
+          anonimo,
+          authorName: `${studentProfile.nome} ${studentProfile.cognome}`.trim() || 'Tu',
+        });
+        if (draftId) deleteDraft(draftId, slug);
+      } else {
+        // REALE: salva su Supabase
+        await createReport({
+          boxSlug: slug,
+          type: resolveStoredType(tipo, categoryOptions[0]),
+          title: titolo.trim(),
+          content: problema.trim(),
+          isPublic,
+          isAnonymous: anonimo,
+        });
+        if (draftId) deleteDraft(draftId, slug);
+      }
       setShowPopup(true);
-    }, 1000);
+    } catch (err) {
+      setSubmitError(friendlyError(err, 'Errore durante l\'invio. Riprova.'));
+    } finally {
+      setLoading(false);
+    }
   };
 
+  const titleInvalid = !!fieldErrors.titolo;
+  const tipoInvalid = !!fieldErrors.tipo;
+  const descInvalid = !!fieldErrors.problema;
+
   return (
-    <form onSubmit={handleInvia} className="new-report-grid">
+    <form onSubmit={handleInvia} className="new-report-grid" noValidate>
 
       {/* Header — full width su desktop */}
       <div className="new-report-header">
@@ -150,16 +251,16 @@ export default function NewReport() {
             fontSize: '0.82rem', fontWeight: 700,
           }}>
             <Shield size={16} strokeWidth={2.5} style={{ flexShrink: 0 }} />
-            <span>La tua identità è protetta — visibile solo agli amministratori autorizzati.</span>
+            <span>La tua identità non è collegata a questa segnalazione — gli amministratori non vedono il tuo nome.</span>
           </div>
         )}
       </div>
 
       {/* Colonna sinistra — Dettagli */}
       <div className="new-report-col-left">
-        {error && (
+        {submitError && (
           <div style={{ background: 'var(--b-red)', color: 'white', padding: '12px 16px', marginBottom: 16, border: '2px solid var(--b-black)', fontWeight: 800, fontSize: '0.85rem', textTransform: 'uppercase' }}>
-            Attenzione: {error}
+            Attenzione: {submitError}
           </div>
         )}
 
@@ -168,57 +269,102 @@ export default function NewReport() {
             Dettagli
           </h3>
 
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
-            <label>Titolo Riassuntivo</label>
-            <span style={{ fontSize: '0.7rem', fontWeight: 700, color: 'var(--b-gray)' }}>{titolo.length}/80</span>
-          </div>
-          <input
-            placeholder="Es. Mancano sedie in laboratorio..."
-            value={titolo}
-            onChange={(e) => setTitolo(e.target.value)}
-            maxLength={80}
-            required
-            id="new-report-title"
-          />
-
-          <label>Categoria</label>
-          <Select
-            value={tipo}
-            onChange={setTipo}
-            options={categoryOptions}
-            placeholder="Seleziona una categoria"
-          />
-
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
-            <label>Descrizione</label>
-            <span style={{ fontSize: '0.7rem', fontWeight: 700, color: 'var(--b-gray)' }}>{problema.length}/1000</span>
-          </div>
-          <div style={{
-            position: 'relative', overflow: 'hidden',
-            background: anonimo ? 'var(--b-cream)' : 'var(--b-white)',
-            transition: 'background 0.3s ease',
-            border: '2px solid var(--b-black)'
-          }}>
-            <div style={{
-              position: 'absolute',
-              right: 16, bottom: 16,
-              opacity: anonimo ? 0.08 : 0,
-              transition: 'opacity 0.35s ease',
-              pointerEvents: 'none',
-              color: 'var(--b-black)',
-              lineHeight: 0,
-            }}>
-              <IncognitoIcon size={120} />
+          <div
+            ref={titleRef}
+            key={titleInvalid ? `titolo-shake-${shakeToken}` : 'titolo-ok'}
+            className={titleInvalid ? 'field-shake' : undefined}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
+              <label className={titleInvalid ? 'field-label-error' : undefined}>Titolo Riassuntivo</label>
+              <span style={{
+                fontSize: '0.7rem', fontWeight: 700,
+                color: titleInvalid ? 'var(--b-red)' : 'var(--b-gray)',
+              }}>
+                {titolo.length}/80 · min {TITLE_MIN}
+              </span>
             </div>
-            <textarea
-              placeholder="Spiega bene di cosa si tratta, includendo tutti i dettagli utili..."
-              value={problema}
-              onChange={(e) => setProblema(e.target.value)}
-              maxLength={1000}
-              style={{ minHeight: 200, width: '100%', border: 'none', boxShadow: 'none', margin: 0, background: 'transparent', position: 'relative', zIndex: 1, resize: 'vertical' }}
-              required
-              id="new-report-desc"
+            <input
+              placeholder="Es. Mancano sedie in laboratorio..."
+              value={titolo}
+              onChange={(e) => {
+                setTitolo(e.target.value);
+                clearFieldError('titolo');
+              }}
+              maxLength={80}
+              id="new-report-title"
+              className={titleInvalid ? 'field-invalid' : undefined}
+              aria-invalid={titleInvalid}
             />
+            {titleInvalid && <div className="field-hint-error">{fieldErrors.titolo}</div>}
+          </div>
+
+          <div
+            ref={tipoRef}
+            key={tipoInvalid ? `tipo-shake-${shakeToken}` : 'tipo-ok'}
+            className={tipoInvalid ? 'field-shake' : undefined}
+          >
+            <label className={tipoInvalid ? 'field-label-error' : undefined}>Categoria</label>
+            <Select
+              value={tipo}
+              onChange={(v) => {
+                setTipo(v);
+                clearFieldError('tipo');
+              }}
+              options={categoryOptions}
+              placeholder="Seleziona una categoria"
+              error={tipoInvalid}
+            />
+            {tipoInvalid && <div className="field-hint-error" style={{ marginTop: -8 }}>{fieldErrors.tipo}</div>}
+          </div>
+
+          <div
+            ref={descRef}
+            key={descInvalid ? `desc-shake-${shakeToken}` : 'desc-ok'}
+            className={descInvalid ? 'field-shake' : undefined}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
+              <label className={descInvalid ? 'field-label-error' : undefined}>Descrizione</label>
+              <span style={{
+                fontSize: '0.7rem', fontWeight: 700,
+                color: descInvalid ? 'var(--b-red)' : 'var(--b-gray)',
+              }}>
+                {problema.length}/1000 · min {DESC_MIN}
+              </span>
+            </div>
+            <div
+              className={descInvalid ? 'field-invalid' : undefined}
+              style={{
+                position: 'relative', overflow: 'hidden',
+                background: anonimo ? 'var(--b-cream)' : 'var(--b-white)',
+                transition: 'background 0.3s ease',
+                border: descInvalid ? undefined : '2px solid var(--b-black)',
+              }}
+            >
+              <div style={{
+                position: 'absolute',
+                right: 16, bottom: 16,
+                opacity: anonimo ? 0.08 : 0,
+                transition: 'opacity 0.35s ease',
+                pointerEvents: 'none',
+                color: 'var(--b-black)',
+                lineHeight: 0,
+              }}>
+                <IncognitoIcon size={120} />
+              </div>
+              <textarea
+                placeholder="Spiega bene di cosa si tratta, includendo tutti i dettagli utili..."
+                value={problema}
+                onChange={(e) => {
+                  setProblema(e.target.value);
+                  clearFieldError('problema');
+                }}
+                maxLength={1000}
+                style={{ minHeight: 200, width: '100%', border: 'none', boxShadow: 'none', margin: 0, background: 'transparent', position: 'relative', zIndex: 1, resize: 'vertical' }}
+                id="new-report-desc"
+                aria-invalid={descInvalid}
+              />
+            </div>
+            {descInvalid && <div className="field-hint-error">{fieldErrors.problema}</div>}
           </div>
         </div>
       </div>

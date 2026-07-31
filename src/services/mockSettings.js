@@ -6,6 +6,13 @@ const defaultSettings = {
   whitelist: [],
   requireClass: true,
   categories: ['Un problema', 'Una proposta', 'Un dubbio'],
+  regolamento:
+    'Questo sportello è uno spazio sicuro di ascolto.\n\n' +
+    '1. Rispetta le persone: niente insulti, minacce o contenuti discriminatori.\n' +
+    '2. Usa lo sportello in buona fede: segnala fatti concreti o proposte utili.\n' +
+    '3. Le segnalazioni private restano riservate allo staff.\n' +
+    '4. Nel forum pubblico evita dati personali di terzi.\n' +
+    '5. Lo staff può moderare o chiudere contenuti non conformi.',
 };
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/i;
@@ -51,12 +58,16 @@ function normalize(raw = {}) {
   const whitelistSource = Array.isArray(raw.whitelist) ? raw.whitelist : fallback.whitelist;
   const whitelist = normalizeWhitelist(whitelistSource);
   const categories = normalizeCategories(raw.categories);
+  const regolamento = typeof raw.regolamento === 'string'
+    ? raw.regolamento
+    : fallback.regolamento;
   return {
     slug,
     emailFilterMode,
     whitelist,
     requireClass: typeof raw.requireClass === 'boolean' ? raw.requireClass : fallback.requireClass,
     categories,
+    regolamento,
   };
 }
 

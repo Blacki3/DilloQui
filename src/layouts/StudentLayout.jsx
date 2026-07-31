@@ -1,24 +1,25 @@
 import { Link, useLocation, useParams, useNavigate, useOutlet } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Home, PlusCircle, History, LogOut, Settings, Bell, User, FileText, X, TrendingUp } from 'lucide-react';
-import { useAuth } from '../context/AuthContext';
+import { Home, PlusCircle, History, Bell, User, FileText, TrendingUp, ScrollText } from 'lucide-react';
 import { useState, useRef, useEffect } from 'react';
 import BrandWordmark from '../components/BrandWordmark';
 import { countDrafts } from '../services/draftStore';
-import { useNotifications, markAllNotificationsRead } from '../services/mockStore';
+import { useNotifications, markAllNotificationsRead, markNotificationRead } from '../services/mockStore';
 
 export default function StudentLayout() {
   const { slug } = useParams();
   const location = useLocation();
   const navigate = useNavigate();
-  const { logoutStudent } = useAuth();
   const [showProfile, setShowProfile] = useState(false);
   const [showNewMenu, setShowNewMenu] = useState(false);
   const profileRef = useRef(null);
   const newMenuRef = useRef(null);
   const currentOutlet = useOutlet();
-  const draftCount = countDrafts();
-  const notifications = useNotifications();
+  const draftCount = countDrafts(slug);
+  const isDemo = slug === 'demo';
+  const mockNotifications = useNotifications();
+  // Mock solo sulla box demo; sulle box reali lista vuota (niente leak di notifiche fake)
+  const notifications = isDemo ? mockNotifications : [];
   const unreadCount = notifications.filter(n => !n.read).length;
 
   const isActive = (path) => {
@@ -41,11 +42,27 @@ export default function StudentLayout() {
     setShowNewMenu(false);
   }, [location.pathname]);
 
+  const openNotification = (n) => {
+    if (!n.read) markNotificationRead(n.id);
+    setShowProfile(false);
+    if (n.reportId) {
+      navigate(`/box/${slug}/post/${n.reportId}`);
+    }
+  };
+
+  const handleMarkAllRead = () => {
+    markAllNotificationsRead();
+  };
+
   const tabs = [
     { name: 'Forum',    path: `/box/${slug}/forum`,      icon: Home,       id: 'forum' },
     { name: 'Tendenze', path: `/box/${slug}/tendenze`,   icon: TrendingUp, id: 'tendenze' },
     { name: 'Nuova',    path: `/box/${slug}/new`,        icon: PlusCircle, id: 'new', isNew: true },
     { name: 'Storico',  path: `/box/${slug}/history`,    icon: History,    id: 'history' },
+  ];
+
+  const desktopExtra = [
+    { name: 'Regole', path: `/box/${slug}/regolamento`, icon: ScrollText, id: 'regolamento' },
   ];
 
   return (
@@ -77,7 +94,7 @@ export default function StudentLayout() {
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
             {/* Desktop links */}
             <div className="student-nav-links desktop-nav" style={{ gap: 4 }}>
-              {tabs.map(tab => (
+              {[...tabs, ...desktopExtra].map(tab => (
                 <Link
                   key={tab.id}
                   to={tab.path}
@@ -128,7 +145,7 @@ export default function StudentLayout() {
                     <div style={{ padding: '12px 16px', borderBottom: '2px solid var(--b-black)', fontWeight: 800, textTransform: 'uppercase', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                       Notifiche
                       {unreadCount > 0 && (
-                        <button onClick={markAllNotificationsRead} style={{ background: 'transparent', border: 'none', color: 'var(--b-blue)', cursor: 'pointer', fontSize: '0.75rem', fontWeight: 700, textDecoration: 'underline' }}>Segna lette</button>
+                        <button onClick={handleMarkAllRead} style={{ background: 'transparent', border: 'none', color: 'var(--b-blue)', cursor: 'pointer', fontSize: '0.75rem', fontWeight: 700, textDecoration: 'underline' }}>Segna lette</button>
                       )}
                     </div>
                     <div style={{ maxHeight: 250, overflowY: 'auto' }}>
@@ -138,12 +155,7 @@ export default function StudentLayout() {
                         notifications.map(n => (
                           <div 
                             key={n.id} 
-                            onClick={() => {
-                              setShowProfile(false);
-                              if (n.reportId) {
-                                navigate(`/box/${slug}/post/${n.reportId}`);
-                              }
-                            }}
+                            onClick={() => openNotification(n)}
                             style={{ padding: '12px 16px', borderBottom: '1px solid rgba(0,0,0,0.1)', background: n.read ? 'transparent' : 'rgba(255, 238, 0, 0.15)', cursor: 'pointer', transition: 'background 0.2s' }}
                           >
                             <span style={{ fontSize: '0.85rem', color: 'var(--b-black)', display: 'block', marginBottom: 4, fontWeight: n.read ? 500 : 700 }}>{n.text}</span>
