@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect } from 'react';
 import {
   Search, SlidersHorizontal, MessageSquare, ArrowLeft, Send, CheckCircle2, X, RotateCcw,
-  Inbox, FilterX, ArrowDownUp, Globe, Lock, Users, ChevronLeft, ThumbsUp,
+  Inbox, FilterX, ArrowDownUp, Globe, Lock, Users, ChevronLeft, ThumbsUp, Trash2,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useLocation } from 'react-router-dom';
@@ -31,6 +31,9 @@ import {
   useAdminReadVersionReal,
 } from '../../services/adminReadStore';
 import { getAllReports, updateReport, sendChatMessage, getChatMessages } from '../../services/db';
+import ConfirmModal from '../../components/ConfirmModal';
+import { supabase } from '../../lib/supabaseClient';
+import { usePolling } from '../../hooks/usePolling';
 
 const STATUS_TABS = [
   { value: 'all', label: 'Tutte' },
@@ -275,6 +278,7 @@ function ReportDetailView({
   onBack,
   sendChatMsg,
   applyStatus,
+  setShowDeleteModal,
 }) {
   const statusClass = STATUS_BADGE_CLASS[report.status] || 'badge badge-status-new';
   const typeClass = getTypeBadgeClass(report.type);
@@ -385,6 +389,14 @@ function ReportDetailView({
                 <RotateCcw size={15} strokeWidth={3} /> Riapri (In Revisione)
               </button>
             )}
+            <button
+              className="report-status-btn"
+              onClick={() => setShowDeleteModal(report.id)}
+              style={{ background: '#ffebeb', color: 'var(--b-red)', borderColor: 'var(--b-red)' }}
+              id="admin-delete-report-btn"
+            >
+              <Trash2 size={15} strokeWidth={3} /> Elimina Segnalazione
+            </button>
           </>
         )}
       </div>
@@ -481,38 +493,48 @@ export default function ReportsList() {
   const boxSlug = isDemo ? 'demo' : profile?.box_slug;
   const adminId = profile?.id || '';
 
-  // ── Dati: demo usa mock, reale usa Supabase ────────────────────────────
+  // Dati
   const mockReports = useReportsMock();
   const [realReports, setRealReports] = useState([]);
   const [loadingReports, setLoadingReports] = useState(!isDemo);
 
-  useEffect(() => {
-    if (isDemo || !boxSlug) return;
-    setLoadingReports(true);
-    getAllReports(boxSlug)
-      .then(data => {
-        // Normalizza Supabase → formato atteso dalla UI
-        setRealReports(data.map(r => ({
-          ...r,
-          createdAt: new Date(r.created_at).getTime(),
-          date: new Date(r.created_at).toLocaleDateString('it-IT', {
-            day: 'numeric', month: 'short', year: 'numeric',
-          }),
-          isPublic: r.is_public,
-          isAnonymous: r.is_anonymous,
-          anonimo: r.is_anonymous,
-          authorName: r.is_anonymous
-            ? null
-            : (r.profiles?.nome ? `${r.profiles.nome} ${r.profiles.cognome || ''}`.trim() : null),
-          authorClass: r.is_anonymous ? null : (r.profiles?.classe || null),
-          likes: r.votes?.[0]?.count || 0,
-          comments: [],
-          chat: [], // popolata all'apertura del dettaglio
-        })));
+  const fetchReports = () => {
+    if (isDemo || !boxSlug) return Promise.resolve();
+    return getAllReports(boxSlug)
+      .then((data) => {
+        setRealReports((prev) => {
+          // Uniamo la chat già caricata se presente
+          return data.map((r) => {
+            const old = prev.find((o) => o.id === r.id);
+            return {
+              ...r,
+              createdAt: new Date(r.created_at).getTime(),
+              date: new Date(r.created_at).toLocaleDateString('it-IT', {
+                day: 'numeric', month: 'short', year: 'numeric',
+              }),
+              isPublic: r.is_public,
+              isAnonymous: r.is_anonymous,
+              anonimo: r.is_anonymous,
+              authorName: r.is_anonymous
+                ? null
+                : (r.profiles?.nome ? `${r.profiles.nome} ${r.profiles.cognome || ''}`.trim() : null),
+              authorClass: r.is_anonymous ? null : (r.profiles?.classe || null),
+              likes: r.votes?.[0]?.count || 0,
+              comments: [],
+              chat: old?.chat || [], // popolata all'apertura del dettaglio o da realtime
+            };
+          });
+        });
       })
-      .catch(console.error)
-      .finally(() => setLoadingReports(false));
+      .catch(console.error);
+  };
+
+  useEffect(() => {
+    setLoadingReports(true);
+    fetchReports().finally(() => setLoadingReports(false));
   }, [isDemo, boxSlug]);
+
+  usePolling(fetchReports, 15000);
 
   const reports = isDemo ? mockReports : realReports;
   const demoReadVersion = useAdminReadVersion();
@@ -535,6 +557,7 @@ export default function ReportsList() {
   const [soloNonGestite, setSoloNonGestite] = useState(false);
   const [sortBy, setSortBy] = useState('recent');
   const [confirmAction, setConfirmAction] = useState(null);
+  const [showDeleteModal, setShowDeleteModal] = useState(null);
 
   const categoryFilters = useMemo(() => buildCategoryFilters(reports), [reports]);
 
@@ -610,10 +633,9 @@ export default function ReportsList() {
     setConfirmAction(null);
   }, [openChat, isDemo, adminId]);
 
-  // Carica chat reale all'apertura del dettaglio
-  useEffect(() => {
-    if (isDemo || !openChat) return;
-    getChatMessages(openChat)
+  // Carica chat reale all'apertura del dettaglio e abilita WebSockets
+  const fetchChatMessages = (reportId) => {
+    return getChatMessages(reportId)
       .then((msgs) => {
         const mapped = msgs.map((m) => {
           const isAdmin = m.profiles?.role === 'admin';
@@ -631,12 +653,36 @@ export default function ReportsList() {
           };
         });
         setRealReports((prev) =>
-          prev.map((r) => (r.id === openChat ? { ...r, chat: mapped } : r)),
+          prev.map((r) => (r.id === reportId ? { ...r, chat: mapped } : r)),
         );
-        // Rileggi dopo il load chat così messaggi studente precedenti non restano "unread"
-        if (adminId) markReportReadReal(adminId, openChat);
+        if (adminId) markReportReadReal(adminId, reportId);
       })
       .catch(console.error);
+  };
+
+  useEffect(() => {
+    if (isDemo || !openChat) return;
+    
+    // 1. Carica subito la chat
+    fetchChatMessages(openChat);
+
+    // 2. Abilita Realtime WebSocket solo per questa specifica chat
+    const channel = supabase.channel(`chat_${openChat}`)
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'chat_messages', filter: `report_id=eq.${openChat}` },
+        () => {
+          // Quando arriva un nuovo messaggio, ricarica la chat per questo report
+          fetchChatMessages(openChat);
+          // E ricarica anche la lista dei report per aggiornare lo stato se cambiato
+          fetchReports();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, [openChat, isDemo, adminId]);
 
   useEffect(() => {
@@ -706,6 +752,25 @@ export default function ReportsList() {
     setConfirmAction(null);
   };
 
+  const handleDeleteReport = async (reportId) => {
+    if (!reportId) return;
+    if (isDemo) {
+      alert("L'eliminazione in modalità demo non è attiva.");
+      setShowDeleteModal(null);
+    } else {
+      try {
+        const { deleteReport } = await import('../../services/db');
+        await deleteReport(reportId);
+        setRealReports(prev => prev.filter(r => r.id !== reportId));
+        if (openChat === reportId) setOpenChat(null);
+      } catch (err) {
+        console.error('Errore durante eliminazione segnalazione:', err);
+      } finally {
+        setShowDeleteModal(null);
+      }
+    }
+  };
+
   const handleQuickStatus = async (e, reportId, status) => {
     e.stopPropagation();
     e.preventDefault();
@@ -735,6 +800,7 @@ export default function ReportsList() {
     onBack: () => setOpenChat(null),
     sendChatMsg,
     applyStatus,
+    setShowDeleteModal,
   } : null;
 
   if (openChat && openReport && !isWide) {
@@ -949,7 +1015,6 @@ export default function ReportsList() {
                     {statusLabel}
                   </span>
                 </div>
-                {(showResolve || showClose) && (
                   <div className="admin-report-quick-actions">
                     {showResolve && (
                       <button
@@ -971,8 +1036,19 @@ export default function ReportsList() {
                         <X size={14} strokeWidth={3} />
                       </button>
                     )}
+                    <button
+                      type="button"
+                      className="admin-report-quick-btn closed"
+                      style={{ color: 'var(--b-red)', borderColor: 'var(--b-red)' }}
+                      aria-label={`Elimina segnalazione: ${report.title}`}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setShowDeleteModal(report.id);
+                      }}
+                    >
+                      <Trash2 size={14} strokeWidth={3} />
+                    </button>
                   </div>
-                )}
               </div>
             </div>
           );
@@ -1041,6 +1117,16 @@ export default function ReportsList() {
           </button>
         )}
       </div>
+
+      <ConfirmModal
+        isOpen={!!showDeleteModal}
+        onClose={() => setShowDeleteModal(null)}
+        onConfirm={() => handleDeleteReport(showDeleteModal)}
+        title="Elimina Segnalazione"
+        message="ATTENZIONE: Sei sicuro di voler eliminare definitivamente questa segnalazione?"
+        confirmText="Elimina"
+        isDanger={true}
+      />
     </motion.div>
   );
 }

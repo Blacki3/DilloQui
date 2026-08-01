@@ -4,18 +4,29 @@ import { supabase } from '../lib/supabaseClient';
 const AuthContext = createContext();
 
 export function AuthProvider({ children }) {
-  // ─── Stato sessione Supabase reale ────────────────────────────────────────
+  // Stato sessione Supabase reale
   const [session, setSession] = useState(null);       // sessione Supabase
   const [profile, setProfile] = useState(null);       // profilo da tabella profiles
   const [loading, setLoading] = useState(true);       // true mentre Supabase verifica la sessione
   // Soft flag: fetch profilo fallito (non lascia null silenzioso per sempre)
   const [profileError, setProfileError] = useState(null);
+  const [isRecoveringPassword, setIsRecoveringPassword] = useState(false);
 
-  // ─── Stato mock per la Demo (invariato) ──────────────────────────────────
+  // Stato mock per la Demo
   const [adminToken, setAdminToken] = useState(() => localStorage.getItem('adminToken') || '');
   const [studentToken, setStudentToken] = useState(() => localStorage.getItem('studentToken') || '');
 
-  // ─── Persistenza token mock ───────────────────────────────────────────────
+
+
+  const updatePassword = async (newPassword) => {
+    const { data, error } = await supabase.auth.updateUser({ password: newPassword });
+    if (!error) {
+      setIsRecoveringPassword(false);
+    }
+    return { data, error };
+  };
+
+  // Persistenza token mock
   useEffect(() => {
     if (adminToken) localStorage.setItem('adminToken', adminToken);
     else localStorage.removeItem('adminToken');
@@ -26,7 +37,7 @@ export function AuthProvider({ children }) {
     else localStorage.removeItem('studentToken');
   }, [studentToken]);
 
-  // ─── Inizializzazione sessione Supabase ───────────────────────────────────
+  // Inizializzazione sessione Supabase
   useEffect(() => {
     // Legge la sessione attiva al primo caricamento.
     // ATTENZIONE: aspettiamo anche il profilo prima di togliere il loading,
@@ -45,6 +56,9 @@ export function AuthProvider({ children }) {
     // Defer del fetch profilo: chiamare Supabase sync dentro onAuthStateChange
     // può deadlockare il client (pattern documentato da Supabase).
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, nextSession) => {
+      if (_event === 'PASSWORD_RECOVERY') {
+        setIsRecoveringPassword(true);
+      }
       setSession(nextSession);
       if (nextSession?.user) {
         const userId = nextSession.user.id;
@@ -94,7 +108,7 @@ export function AuthProvider({ children }) {
     if (user) await fetchProfile(user.id);
   };
 
-  // ─── AUTH REALE: Studenti (OTP via email) ────────────────────────────────
+  // AUTH REALE: Studenti (OTP via email)
 
   /**
    * Passo 1: invia OTP all'email dello studente.
@@ -179,7 +193,7 @@ export function AuthProvider({ children }) {
     return data;
   };
 
-  // ─── AUTH REALE: Admin (email + password) ────────────────────────────────
+  // AUTH REALE: Admin (email + password)
 
   /**
    * Login admin con email e password.
@@ -273,7 +287,7 @@ export function AuthProvider({ children }) {
     setProfileError(null);
   };
 
-  // ─── AUTH MOCK: Demo (invariato rispetto all'Alpha 0.5) ──────────────────
+  // AUTH MOCK: Demo (invariato rispetto all'Alpha 0.5)
 
   /** Login admin demo (token mock in localStorage) */
   const loginAdmin = (token) => setAdminToken(token);
@@ -284,7 +298,7 @@ export function AuthProvider({ children }) {
   /** Logout studente demo */
   const logoutStudent = () => setStudentToken('');
 
-  // ─── Flag di autenticazione ───────────────────────────────────────────────
+  // Flag di autenticazione
 
   // Admin REALE: solo sessione Supabase con ruolo admin (mai il token mock)
   const isRealAdminAuthenticated = !!session && profile?.role === 'admin';
@@ -309,6 +323,9 @@ export function AuthProvider({ children }) {
       loginAdminReal,
       registerAdminReal,
       logoutReal,
+      updatePassword,
+      isRecoveringPassword,
+      setIsRecoveringPassword,
       // Mock demo (invariati)
       adminToken,
       studentToken,

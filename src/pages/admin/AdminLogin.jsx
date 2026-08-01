@@ -18,6 +18,7 @@ export default function AdminLogin() {
   const [nome, setNome] = useState('');
   const [cognome, setCognome] = useState('');
   const [nomeSportello, setNomeSportello] = useState('');
+  const [acceptedTerms, setAcceptedTerms] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const navigate = useNavigate();
@@ -25,7 +26,7 @@ export default function AdminLogin() {
 
   useEffect(() => {
     // Preload del bundle principale in background
-    import('../../bundles/AppBundle');
+    // Removed AppBundle preloading
     if (isDemo) {
       if (isAdminAuthenticated) {
         navigate('/demo/admin/dashboard', { replace: true });
@@ -43,7 +44,7 @@ export default function AdminLogin() {
 
     try {
       if (isDemo) {
-        // ── DEMO: login mock invariato ──────────────────────────────────
+        // DEMO: login mock invariato
         const previous = getAdminProfile();
         saveAdminProfile({
           ...previous,
@@ -54,10 +55,15 @@ export default function AdminLogin() {
         loginAdmin('mock-admin-token');
         navigate('/demo/admin/dashboard');
       } else {
-        // ── REALE: login o registrazione con Supabase ───────────────────
+        // REALE: login o registrazione con Supabase
         if (isRegistering) {
           if (!nome.trim() || !cognome.trim() || !nomeSportello.trim()) {
             setError('Compila tutti i campi richiesti per la registrazione.');
+            setLoading(false);
+            return;
+          }
+          if (!acceptedTerms) {
+            setError('Devi accettare i Termini di Servizio e la Privacy Policy per registrarti.');
             setLoading(false);
             return;
           }
@@ -147,6 +153,19 @@ export default function AdminLogin() {
                 </div>
                 <label style={{ textAlign: 'left', display: 'block' }}>Nome Sportello / Scuola</label>
                 <input type="text" placeholder="Es. Liceo Leonardo da Vinci" value={nomeSportello} onChange={e => setNomeSportello(e.target.value)} required id="admin-reg-sportello" />
+                
+                <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, marginTop: 16, marginBottom: 8, textAlign: 'left' }}>
+                  <input 
+                    type="checkbox" 
+                    id="admin-terms-check" 
+                    checked={acceptedTerms} 
+                    onChange={e => setAcceptedTerms(e.target.checked)} 
+                    style={{ width: 18, height: 18, flexShrink: 0, marginTop: 2, cursor: 'pointer', accentColor: 'var(--b-black)' }}
+                  />
+                  <label htmlFor="admin-terms-check" style={{ fontSize: '0.85rem', color: 'var(--b-black)', fontWeight: 500, lineHeight: 1.4 }}>
+                    Dichiaro di aver letto e accetto i <a href="/termini" target="_blank" rel="noreferrer" style={{color: 'var(--b-black)', textDecoration: 'underline'}}>Termini di Servizio</a> e la <a href="/privacy" target="_blank" rel="noreferrer" style={{color: 'var(--b-black)', textDecoration: 'underline'}}>Privacy Policy</a>.
+                  </label>
+                </div>
               </>
             )}
 

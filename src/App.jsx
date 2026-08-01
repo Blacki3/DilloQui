@@ -2,36 +2,42 @@ import { useEffect, Suspense, lazy } from 'react';
 import { Routes, Route, Navigate, useParams, useLocation } from 'react-router-dom';
 import PublicLayout from './layouts/PublicLayout';
 import Landing from './pages/Landing';
-import About from './pages/About';
 import { useAuth } from './context/AuthContext';
 
 // Lazy loading delle schermate di accesso (caricamento indipendente e rapido)
 const Verify = lazy(() => import('./pages/Verify'));
-const AdminLogin = lazy(() => import('./pages/admin/AdminLogin'));
-
+const About = lazy(() => import('./pages/About'));
+const Privacy = lazy(() => import('./pages/Privacy'));
+const Terms = lazy(() => import('./pages/Terms'));
+const Cookie = lazy(() => import('./pages/Cookie'));
+import AdminLogin from './pages/admin/AdminLogin';
+import PasswordRecoveryModal from './components/PasswordRecoveryModal';
 import DemoSwitcher from './components/demo/DemoSwitcher';
 
-// Funzione helper per estrarre i componenti dal bundle unico
-const lazyFromBundle = (componentName) => {
-  return lazy(() => import('./bundles/AppBundle').then(m => ({ default: m[componentName] })));
+// Helper per il preloading in background
+const lazyWithPreload = (factory) => {
+  const Component = lazy(factory);
+  Component.preload = factory;
+  return Component;
 };
 
-// Caricamento dell'intera app in un unico Chunk (Sportello Studenti + Admin)
-const AdminLayout = lazyFromBundle('AdminLayout');
-const Dashboard = lazyFromBundle('Dashboard');
-const ReportsList = lazyFromBundle('ReportsList');
-const Settings = lazyFromBundle('Settings');
-const AdminProfile = lazyFromBundle('AdminProfile');
-const UsersList = lazyFromBundle('UsersList');
-const StudentLayout = lazyFromBundle('StudentLayout');
-const Forum = lazyFromBundle('Forum');
-const PostDetail = lazyFromBundle('PostDetail');
-const NewReport = lazyFromBundle('NewReport');
-const MyReports = lazyFromBundle('MyReports');
-const StudentProfile = lazyFromBundle('StudentProfile');
-const Drafts = lazyFromBundle('Drafts');
-const Tendenze = lazyFromBundle('Tendenze');
-const Regolamento = lazyFromBundle('Regolamento');
+// Code Splitting con Preload - Esportati per poter chiamare .preload() nei Layout
+export const AdminLayout = lazyWithPreload(() => import('./layouts/AdminLayout'));
+export const Dashboard = lazyWithPreload(() => import('./pages/admin/Dashboard'));
+export const ReportsList = lazyWithPreload(() => import('./pages/admin/ReportsList'));
+export const Settings = lazyWithPreload(() => import('./pages/admin/Settings'));
+export const AdminProfile = lazyWithPreload(() => import('./pages/admin/AdminProfile'));
+export const UsersList = lazyWithPreload(() => import('./pages/admin/UsersList'));
+
+export const StudentLayout = lazyWithPreload(() => import('./layouts/StudentLayout'));
+export const Forum = lazyWithPreload(() => import('./pages/student/Forum'));
+export const PostDetail = lazyWithPreload(() => import('./pages/student/PostDetail'));
+export const NewReport = lazyWithPreload(() => import('./pages/student/NewReport'));
+export const MyReports = lazyWithPreload(() => import('./pages/student/MyReports'));
+export const StudentProfile = lazyWithPreload(() => import('./pages/student/StudentProfile'));
+export const Drafts = lazyWithPreload(() => import('./pages/student/Drafts'));
+export const Tendenze = lazyWithPreload(() => import('./pages/student/Tendenze'));
+export const Regolamento = lazyWithPreload(() => import('./pages/student/Regolamento'));
 
 // Fallback Loader in stile Brutalista
 const BrutalistLoader = () => (
@@ -119,6 +125,9 @@ function App() {
           <Route element={<PublicLayout />}>
             <Route path="/" element={<Landing />} />
             <Route path="/chi-siamo" element={<About />} />
+            <Route path="/privacy" element={<Privacy />} />
+            <Route path="/termini" element={<Terms />} />
+            <Route path="/cookie" element={<Cookie />} />
           </Route>
 
           {/* Route Studenti */}
@@ -174,6 +183,7 @@ function App() {
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
         <DemoSwitcher />
+        <PasswordRecoveryModal />
       </Suspense>
     </>
   );

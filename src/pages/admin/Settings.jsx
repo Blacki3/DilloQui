@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react';
-import { Check, Link, Plus, Trash2, ScrollText } from 'lucide-react';
-import { motion } from 'framer-motion';
+import { Check, Link, Plus, Trash2, ScrollText, Save } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { useLocation } from 'react-router-dom';
 import CopyLinkButton from '../../components/CopyLinkButton';
 import { useAuth } from '../../context/AuthContext';
+import ConfirmModal from '../../components/ConfirmModal';
 // Mock (solo per la demo)
 import { getSettings as getSettingsMock, saveSettings as saveSettingsMock } from '../../services/mockSettings';
 // Reale
@@ -42,6 +43,8 @@ export default function Settings() {
   const [slug, setSlug] = useState('');
   const [savedSlug, setSavedSlug] = useState('');
   const [savingSlug, setSavingSlug] = useState(false);
+  const [showResetModal, setShowResetModal] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [requireClass, setRequireClass] = useState(false);
   const [emailFilterMode, setEmailFilterMode] = useState('exact');
   const [categories, setCategories] = useState([]);
@@ -210,6 +213,36 @@ export default function Settings() {
     }
   };
 
+  const handleResetBox = async () => {
+    try {
+      if (!isDemo) {
+        const { resetBox } = await import('../../services/db');
+        await resetBox(boxSlug);
+      }
+      showSave("Tutte le segnalazioni sono state eliminate.", "success");
+      setShowResetModal(false);
+    } catch (err) {
+      console.error(err);
+      showSave("Errore durante il reset dello sportello.", "error");
+    }
+  };
+
+  const handleDeleteBox = async () => {
+    try {
+      if (!isDemo) {
+        const { deleteBox } = await import('../../services/db');
+        await deleteBox(boxSlug);
+      }
+      showSave("Sportello eliminato.", "success");
+      setTimeout(() => {
+        window.location.href = '/admin';
+      }, 1500);
+    } catch (err) {
+      console.error(err);
+      showSave("Errore durante l'eliminazione dello sportello.", "error");
+    }
+  };
+
   const SectionTitle = ({ children }) => (
     <div style={{ fontSize: '0.68rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.09em', color: 'var(--b-gray)', marginBottom: 8, marginLeft: 2, marginTop: 24 }}>
       {children}
@@ -249,6 +282,7 @@ export default function Settings() {
       exit={{ opacity: 0, y: -15 }}
       transition={{ duration: 0.3 }}
     >
+      <AnimatePresence>
       {/* Header */}
       <div style={{ marginBottom: 28 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
@@ -314,20 +348,24 @@ export default function Settings() {
           {isDemo && (
             <button
               type="button"
-              className="btn-primary"
+              className="btn-primary settings-url-btn"
               onClick={handleSaveSlug}
               disabled={savingSlug || !slug.trim() || slug === savedSlug}
               id="settings-slug-save"
               style={{
-                padding: '0 16px', border: 'none', borderLeft: '2px solid var(--b-black)',
+                display: 'flex', alignItems: 'center', gap: 6,
+                padding: '0 18px', border: 'none', borderLeft: '2px solid var(--b-black)',
                 boxShadow: 'none', fontSize: '0.78rem', letterSpacing: '0.04em',
-                alignSelf: 'stretch', flexShrink: 0, minWidth: 90, borderRadius: 0,
+                alignSelf: 'stretch', flexShrink: 0, minWidth: 100, borderRadius: 0,
               }}
             >
-              {savingSlug ? '...' : 'Salva'}
+              {savingSlug ? '...' : (
+                <>
+                  <Save size={16} strokeWidth={2.5} /> Salva
+                </>
+              )}
             </button>
           )}
-          <CopyLinkButton url={`dilloqui.netlify.app/box/${slug}`} label="Copia" icon="copy" id="settings-slug-btn" style={{ padding: '0 18px', border: 'none', borderLeft: '2px solid var(--b-black)', boxShadow: 'none', fontSize: '0.78rem', letterSpacing: '0.04em', alignSelf: 'stretch', flexShrink: 0, minWidth: 100 }} />
         </div>
         <div style={{
           fontSize: '0.78rem',
@@ -469,6 +507,69 @@ export default function Settings() {
           {savingRegolamento ? 'Salvataggio...' : 'Salva Regolamento'}
         </button>
       </div>
+
+      {/* Danger Zone (GDPR) */}
+      <SectionTitle><span style={{ color: 'var(--b-red)' }}>Zona Pericolosa</span></SectionTitle>
+      <div className="flat-panel" style={{ border: '3px solid var(--b-red)' }}>
+        <p style={{ color: 'var(--b-gray)', marginBottom: 20, fontSize: '0.9rem' }}>
+          Azioni distruttive e irreversibili. Da usare con cautela o a fine anno scolastico.
+        </p>
+        
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingBottom: 16, borderBottom: '2px dashed var(--b-gray-l)' }}>
+            <div>
+              <h3 style={{ margin: 0, fontSize: '0.9rem', textTransform: 'uppercase', color: 'var(--b-black)' }}>Svuota Sportello (Reset)</h3>
+              <p style={{ margin: 0, fontSize: '0.82rem', color: 'var(--b-gray)' }}>Elimina tutte le segnalazioni e i messaggi ricevuti finora.</p>
+            </div>
+            <button
+              onClick={() => setShowResetModal(true)}
+              className="btn-secondary"
+              style={{ color: 'var(--b-red)', borderColor: 'var(--b-red)' }}
+            >
+              Svuota
+            </button>
+          </div>
+
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <div>
+              <h3 style={{ margin: 0, fontSize: '0.9rem', textTransform: 'uppercase', color: 'var(--b-red)' }}>Elimina Sportello</h3>
+              <p style={{ margin: 0, fontSize: '0.82rem', color: 'var(--b-gray)' }}>Distrugge definitivamente la Box e <b>tutti</b> i dati al suo interno.</p>
+            </div>
+            <button
+              onClick={() => setShowDeleteModal(true)}
+              style={{
+                background: 'var(--b-red)', color: '#fff', border: '2px solid var(--b-black)',
+                padding: '8px 16px', fontWeight: 800, textTransform: 'uppercase', fontSize: '0.75rem',
+                cursor: 'pointer', boxShadow: '3px 3px 0 var(--b-black)'
+              }}
+            >
+              <Trash2 size={16} style={{ marginBottom: -3, marginRight: 4 }} />
+              Elimina
+            </button>
+          </div>
+        </div>
+      </div>
+      </AnimatePresence>
+
+      <ConfirmModal
+        isOpen={showResetModal}
+        onClose={() => setShowResetModal(false)}
+        onConfirm={handleResetBox}
+        title="Svuota Sportello"
+        message="ATTENZIONE: Stai per eliminare TUTTE le segnalazioni, i messaggi e i voti di questo sportello. L'operazione è irreversibile e cancellerà i dati per sempre. Vuoi continuare?"
+        confirmText="Svuota tutto"
+        isDanger={true}
+      />
+
+      <ConfirmModal
+        isOpen={showDeleteModal}
+        onClose={() => setShowDeleteModal(false)}
+        onConfirm={handleDeleteBox}
+        title="Elimina Sportello"
+        message="ATTENZIONE ESTREMA: Stai per distruggere completamente questo sportello, inclusi tutti i dati, le segnalazioni e la whitelist. L'operazione è irreversibile. Procedere?"
+        confirmText="Elimina Definitivamente"
+        isDanger={true}
+      />
     </motion.div>
   );
 }

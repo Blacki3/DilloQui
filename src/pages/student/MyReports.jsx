@@ -7,6 +7,8 @@ import {
   sendChatMessage, getChatMessages, getAnonChatMessages, sendAnonChatMessage,
 } from '../../services/db';
 import { useAuth } from '../../context/AuthContext';
+import { supabase } from '../../lib/supabaseClient';
+import { usePolling } from '../../hooks/usePolling';
 
 const filterTabs = ['Tutte', 'In Lavorazione', 'Chiuse'];
 
@@ -15,35 +17,42 @@ export default function MyReports() {
   const isDemo = slug === 'demo';
   const { profile } = useAuth();
 
-  // ── Dati: demo usa mock, reale usa Supabase ────────────────────────────
+  // Dati
   const mockReports = useReportsMock().filter(r => r.mine).sort((a, b) => b.createdAt - a.createdAt);
   const [realReports, setRealReports] = useState([]);
   const [loadingReports, setLoadingReports] = useState(!isDemo);
 
-  useEffect(() => {
-    if (isDemo) return;
-    setLoadingReports(true);
-    // Carica sia le segnalazioni identificate che quelle anonime
-    // (le anonime vengono recuperate tramite i token salvati in localStorage)
-    Promise.all([getMyReports(), getMyAnonReports()])
+  const fetchReports = () => {
+    if (isDemo) return Promise.resolve();
+    return Promise.all([getMyReports(), getMyAnonReports()])
       .then(([identified, anonymous]) => {
-        const mapReport = (r) => ({
-          ...r,
-          createdAt: new Date(r.created_at).getTime(),
-          date: new Date(r.created_at).toLocaleDateString('it-IT', { day: 'numeric', month: 'short', year: 'numeric' }),
-          isPublic: r.is_public,
-          mine: true,
-          chat: [],                    // popolata all'apertura della conversazione
-          chatCount: r.chat_messages?.[0]?.count ?? 0,
-          anonToken: r.anon_token || null, // presente solo per le segnalazioni anonime
+        setRealReports((prev) => {
+          const mapReport = (r) => {
+            const old = prev.find((o) => o.id === r.id);
+            return {
+              ...r,
+              createdAt: new Date(r.created_at).getTime(),
+              date: new Date(r.created_at).toLocaleDateString('it-IT', { day: 'numeric', month: 'short', year: 'numeric' }),
+              isPublic: r.is_public,
+              mine: true,
+              chat: old?.chat || [], // popolata all'apertura o da realtime
+              chatCount: r.chat_messages?.[0]?.count ?? 0,
+              anonToken: r.anon_token || null,
+            };
+          };
+          return [...identified.map(mapReport), ...anonymous.map(mapReport)]
+            .sort((a, b) => b.createdAt - a.createdAt);
         });
-        const merged = [...identified.map(mapReport), ...anonymous.map(mapReport)]
-          .sort((a, b) => b.createdAt - a.createdAt);
-        setRealReports(merged);
       })
-      .catch(console.error)
-      .finally(() => setLoadingReports(false));
+      .catch(console.error);
+  };
+
+  useEffect(() => {
+    setLoadingReports(true);
+    fetchReports().finally(() => setLoadingReports(false));
   }, [isDemo]);
+
+  usePolling(fetchReports, 60000);
 
   const reports = isDemo ? mockReports : realReports;
   const [activeFilter, setActiveFilter] = useState('Tutte');
@@ -52,21 +61,15 @@ export default function MyReports() {
   const [confirmClose, setConfirmClose] = useState(null);
   const chatEndRef = useRef(null);
 
-  // Carica i messaggi della chat quando si apre una conversazione (solo reale)
-  useEffect(() => {
-    if (isDemo || !openChat) return;
-    const rep = realReports.find(r => r.id === openChat);
-    if (!rep) return;
-
+  // Carica i messaggi della chat e avvia WebSocket (solo reale)
+  const fetchChatMessagesForReport = (rep) => {
     const fetchMsgs = rep.anonToken
       ? getAnonChatMessages(rep.id, rep.anonToken)
       : getChatMessages(rep.id);
 
-    fetchMsgs
+    return fetchMsgs
       .then(msgs => {
         const mapped = msgs.map(m => {
-          // Segnalazione anonima: i miei messaggi hanno anon_token, quelli admin author_id.
-          // Segnalazione identificata: i miei messaggi hanno il mio author_id.
           const isAdmin = rep.anonToken ? !!m.author_id : m.author_id !== profile?.id;
           return {
             id: m.id,
@@ -77,10 +80,35 @@ export default function MyReports() {
           };
         });
         setRealReports(prev => prev.map(r =>
-          r.id === openChat ? { ...r, chat: mapped, chatCount: mapped.length } : r
+          r.id === rep.id ? { ...r, chat: mapped, chatCount: mapped.length } : r
         ));
       })
       .catch(console.error);
+  };
+
+  useEffect(() => {
+    if (isDemo || !openChat) return;
+    const rep = realReports.find(r => r.id === openChat);
+    if (!rep) return;
+
+    // 1. Fetch iniziale
+    fetchChatMessagesForReport(rep);
+
+    // 2. Iscrizione Realtime per questa specifica chat
+    const channel = supabase.channel(`student_chat_${openChat}`)
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'chat_messages', filter: `report_id=eq.${openChat}` },
+        () => {
+          fetchChatMessagesForReport(rep);
+          fetchReports(); // Aggiorna anche la lista esterna (chatCount/stato)
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [openChat, isDemo]);
 

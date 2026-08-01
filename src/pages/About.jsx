@@ -1,6 +1,7 @@
 import { useNavigate } from 'react-router-dom';
 import { Users, Megaphone, ArrowRight, ChevronRight } from 'lucide-react';
 import BrandWordmark from '../components/BrandWordmark';
+import Footer from '../components/Footer';
 
 export default function About() {
   const navigate = useNavigate();
@@ -200,37 +201,7 @@ export default function About() {
         </div>
       </section>
 
-      {/* ── FOOTER ── */}
-      <footer style={{
-        background: 'var(--b-black)',
-        color: '#ffffff',
-        padding: '60px 24px 40px',
-        textAlign: 'center',
-        borderTop: '3px solid var(--b-black)',
-      }}>
-        <div style={{ marginBottom: 24 }}>
-          <BrandWordmark variant="inverted" />
-        </div>
-        <div style={{ display: 'flex', justifyContent: 'center', gap: 32, flexWrap: 'wrap', marginBottom: 32 }}>
-          {['Privacy Policy', 'Termini di Servizio', 'Cookie Policy', 'Contatti'].map(l => (
-            <a key={l} href="#" style={{
-              color: 'var(--b-gray-l)',
-              fontSize: '0.9rem',
-              textDecoration: 'none',
-              fontWeight: 700,
-              textTransform: 'uppercase',
-              letterSpacing: '0.05em',
-            }}
-              onMouseEnter={e => e.target.style.color = 'var(--b-yellow)'}
-              onMouseLeave={e => e.target.style.color = 'var(--b-gray-l)'}
-            >
-              {l}
-            </a>
-          ))}
-        </div>
-        <div style={{ width: 80, height: 3, background: 'var(--b-gray)', margin: '0 auto 24px' }} />
-        <p style={{ margin: 0, fontSize: '0.8rem', color: 'var(--b-gray)', fontFamily: "'IBM Plex Mono', monospace" }}>&copy; {new Date().getFullYear()} DILLOQUI. Tutti i diritti riservati.</p>
-      </footer>
+      <Footer />
     </div>
   );
 }

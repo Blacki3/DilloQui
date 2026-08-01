@@ -102,6 +102,7 @@ CREATE POLICY "Admin vede tutte le segnalazioni del suo box" ON public.reports
 CREATE POLICY "Utente puo inviare segnalazioni" ON public.reports
   FOR INSERT WITH CHECK (
     auth.uid() IS NOT NULL AND
+    box_slug = public.get_my_box_slug() AND
     (
       (is_anonymous = false AND author_id = auth.uid() AND anon_token IS NULL) OR
       (is_anonymous = true  AND author_id IS NULL      AND anon_token IS NOT NULL)

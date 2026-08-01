@@ -7,6 +7,7 @@ import {
   Link as LinkIcon, Tags, Library, Megaphone, Eye
 } from 'lucide-react';
 import BrandWordmark from '../components/BrandWordmark';
+import Footer from '../components/Footer';
 
 const IncognitoIcon = ({ size = 24 }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
@@ -281,28 +282,7 @@ export default function Landing() {
       </section>
 
 
-      <footer className="landing-footer">
-        <div className="landing-footer-brand">
-          <BrandWordmark variant="inverted" />
-        </div>
-        <div className="landing-footer-links">
-          {['Privacy Policy', 'Termini di Servizio', 'Cookie Policy', 'Contatti'].map((l, i) => (
-            <a
-              key={l}
-              href={`#${l.toLowerCase().replace(/ /g, '-')}`}
-              className="landing-footer-link"
-              style={{ borderRight: i < 3 ? '1px solid rgba(255,255,255,0.25)' : 'none' }}
-            >
-              {l}
-            </a>
-          ))}
-        </div>
-        <div className="landing-footer-divider" />
-
-        <p className="landing-footer-copy small">
-          © 2026 DILLOQUI. Tutti i diritti riservati.
-        </p>
-      </footer>
+      <Footer />
     </div>
   );
 }

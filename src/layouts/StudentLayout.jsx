@@ -4,7 +4,16 @@ import { Home, PlusCircle, History, Bell, User, FileText, TrendingUp, ScrollText
 import { useState, useRef, useEffect } from 'react';
 import BrandWordmark from '../components/BrandWordmark';
 import { countDrafts } from '../services/draftStore';
-import { useNotifications, markAllNotificationsRead, markNotificationRead } from '../services/mockStore';
+import { useNotifications, markAllNotificationsRead as mockMarkAllRead, markNotificationRead as mockMarkRead } from '../services/mockStore';
+import { useAuth } from '../context/AuthContext';
+import {
+  getNotifications,
+  markNotificationRead as dbMarkRead,
+  markAllNotificationsRead as dbMarkAllRead,
+} from '../services/db';
+import { Forum, PostDetail, NewReport, MyReports, StudentProfile, Drafts, Tendenze, Regolamento } from '../App';
+import { supabase } from '../lib/supabaseClient';
+import { usePolling } from '../hooks/usePolling';
 
 export default function StudentLayout() {
   const { slug } = useParams();
@@ -15,12 +24,52 @@ export default function StudentLayout() {
   const profileRef = useRef(null);
   const newMenuRef = useRef(null);
   const currentOutlet = useOutlet();
+  const { profile } = useAuth();
   const draftCount = countDrafts(slug);
   const isDemo = slug === 'demo';
   const mockNotifications = useNotifications();
-  // Mock solo sulla box demo; sulle box reali lista vuota (niente leak di notifiche fake)
-  const notifications = isDemo ? mockNotifications : [];
+  // Notifiche reali da Supabase (aggiornate via polling + Realtime)
+  const [realNotifications, setRealNotifications] = useState([]);
+  const notifications = isDemo ? mockNotifications : realNotifications;
   const unreadCount = notifications.filter(n => !n.read).length;
+
+  const fetchNotifications = () => {
+    if (isDemo) return Promise.resolve();
+    return getNotifications()
+      .then(setRealNotifications)
+      .catch(() => {});
+  };
+
+  useEffect(() => { fetchNotifications(); }, [isDemo]);
+  usePolling(fetchNotifications, 30000);
+
+  // Realtime: nuova notifica arriva istantaneamente
+  useEffect(() => {
+    if (isDemo || !profile?.id) return;
+    const channel = supabase.channel('student_notifications')
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'notifications', filter: `user_id=eq.${profile.id}` },
+        () => fetchNotifications()
+      )
+      .subscribe();
+    return () => supabase.removeChannel(channel);
+  }, [isDemo, profile?.id]);
+
+  // Preload in background delle altre rotte Studente
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      Forum.preload?.();
+      PostDetail.preload?.();
+      NewReport.preload?.();
+      MyReports.preload?.();
+      StudentProfile.preload?.();
+      Drafts.preload?.();
+      Tendenze.preload?.();
+      Regolamento.preload?.();
+    }, 1500);
+    return () => clearTimeout(timer);
+  }, []);
 
   const isActive = (path) => {
     if (path === 'new' && location.pathname.includes('drafts')) return true;
@@ -42,16 +91,30 @@ export default function StudentLayout() {
     setShowNewMenu(false);
   }, [location.pathname]);
 
-  const openNotification = (n) => {
-    if (!n.read) markNotificationRead(n.id);
+  const openNotification = async (n) => {
+    // Marca come letta
+    if (!n.read) {
+      if (isDemo) mockMarkRead(n.id);
+      else {
+        dbMarkRead(n.id).catch(() => {});
+        setRealNotifications(prev => prev.map(x => x.id === n.id ? { ...x, read: true } : x));
+      }
+    }
     setShowProfile(false);
-    if (n.reportId) {
+    if (n.url && !isDemo) {
+      navigate(n.url);
+    } else if (n.reportId) {
       navigate(`/box/${slug}/post/${n.reportId}`);
     }
   };
 
-  const handleMarkAllRead = () => {
-    markAllNotificationsRead();
+  const handleMarkAllRead = async () => {
+    if (isDemo) {
+      mockMarkAllRead();
+    } else {
+      dbMarkAllRead().catch(() => {});
+      setRealNotifications(prev => prev.map(x => ({ ...x, read: true })));
+    }
   };
 
   const tabs = [

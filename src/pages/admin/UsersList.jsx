@@ -6,7 +6,7 @@ import { useAuth } from '../../context/AuthContext';
 // Mock (solo per la demo)
 import { getAllUsers, blockUser, deleteUser } from '../../services/mockProfiles';
 // Reale
-import { getBoxUsers } from '../../services/db';
+import { getBoxUsers, toggleUserBan } from '../../services/db';
 
 export default function UsersList() {
   const [users, setUsers] = useState([]);
@@ -51,16 +51,23 @@ export default function UsersList() {
     );
   }
 
-  const handleBlock = (id, isBlocked) => {
-    if (!isDemo) return; // Blocco non implementato su Supabase in questa fase
-    blockUser(id, !isBlocked);
-    loadUsers();
-  };
+  const handleBlock = async (id, isBlocked) => {
+    // Aggiornamento ottimistico per feedback visivo istantaneo
+    setUsers(prev => prev.map(u => 
+      u.id === id ? { ...u, role: !isBlocked ? 'banned' : 'student', status: !isBlocked ? 'blocked' : 'active' } : u
+    ));
 
-  const handleDelete = (id) => {
-    if (!window.confirm('Sei sicuro di voler eliminare questo utente?')) return;
-    if (!isDemo) return; // Eliminazione non implementata su Supabase in questa fase
-    deleteUser(id);
+    if (isDemo) {
+      blockUser(id, !isBlocked);
+    } else {
+      try {
+        await toggleUserBan(id, !isBlocked);
+      } catch (err) {
+        console.error('Errore blocco utente:', err);
+        loadUsers(); // revert in caso di errore
+        return;
+      }
+    }
     loadUsers();
   };
 
@@ -117,15 +124,10 @@ export default function UsersList() {
               <div>Classe</div>
               <div style={{ textAlign: 'right' }}>
                 Azioni
-                {!isDemo && (
-                  <div style={{ fontSize: '0.65rem', fontWeight: 700, textTransform: 'none', letterSpacing: 0, color: 'var(--b-black)', opacity: 0.7, marginTop: 2 }}>
-                    Solo lettura
-                  </div>
-                )}
               </div>
             </div>
             {filtered.map((u, i) => {
-              const isBlocked = u.status === 'blocked';
+              const isBlocked = u.role === 'banned' || u.status === 'blocked';
               return (
                 <div key={u.id} style={{ display: 'grid', gridTemplateColumns: '2fr 2fr 1fr 1fr 1fr', padding: '16px', borderBottom: i < filtered.length - 1 ? '1px solid var(--b-black)' : 'none', background: isBlocked ? '#ffebeb' : 'var(--b-white)', alignItems: 'center' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
@@ -150,7 +152,7 @@ export default function UsersList() {
                   </div>
 
                   <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
-                    {isDemo && u.role !== 'admin' && (
+                    {u.role !== 'admin' && (
                       <button
                         onClick={() => handleBlock(u.id, isBlocked)}
                         title={isBlocked ? 'Sblocca utente' : 'Blocca utente'}
@@ -159,17 +161,6 @@ export default function UsersList() {
                         onMouseLeave={e => e.currentTarget.style.transform = 'none'}
                       >
                         {isBlocked ? <Shield size={16} color="#000" /> : <ShieldBan size={16} color="#000" />}
-                      </button>
-                    )}
-                    {isDemo && (
-                      <button
-                        onClick={() => handleDelete(u.id)}
-                        title="Elimina utente"
-                        style={{ background: 'var(--b-red)', border: '2px solid var(--b-black)', cursor: 'pointer', padding: 6, display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'transform 0.1s' }}
-                        onMouseEnter={e => e.currentTarget.style.transform = 'translate(-1px,-1px)'}
-                        onMouseLeave={e => e.currentTarget.style.transform = 'none'}
-                      >
-                        <Trash2 size={16} color="#fff" />
                       </button>
                     )}
                   </div>

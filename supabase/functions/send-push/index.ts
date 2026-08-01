@@ -127,6 +127,21 @@ Deno.serve(async (req) => {
       await supabase.from('push_subscriptions').delete().in('endpoint', staleEndpoints);
     }
 
+    // ── Salva notifiche in-app per ogni destinatario ─────────────────────
+    // Usiamo service_role → bypassa RLS INSERT (solo il server può scrivere)
+    if (allowedIds.length > 0) {
+      const notifRows = allowedIds.map((uid) => ({
+        user_id: uid,
+        type,
+        title: title || 'DILLOQUI',
+        body: body || '',
+        url,
+        report_id: reportId || null,
+        read: false,
+      }));
+      await supabase.from('notifications').insert(notifRows);
+    }
+
     return json({ sent });
   } catch (err) {
     console.error(err);

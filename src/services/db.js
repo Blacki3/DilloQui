@@ -1,19 +1,5 @@
-/**
- * db.js — Unico punto di accesso a Supabase per DilloQui.
- * Tutte le funzioni usano questo file. Le pagine demo NON importano da qui.
- *
- * Schema DB:
- *   boxes          — slug (PK), name, whitelist[], categories[], email_filter_mode, require_class, notif_emails[], regolamento
- *   profiles       — id (FK auth.users), email, role, nome, cognome, classe, box_slug, default_anon, notifications
- *   reports        — id, box_slug, author_id (NULL se anonimo), anon_token (NULL se identificato), type, title, content, is_public, is_anonymous, status
- *   comments       — id, report_id, author_id, anon_token, is_anonymous, content
- *   votes          — user_id, report_id (PK composita)
- *   chat_messages  — id, report_id, author_id, anon_token, content
- */
-
 import { supabase } from '../lib/supabaseClient';
 
-// ─── Chiave localStorage per i token anonimi ───────────────────────────────
 const ANON_TOKENS_KEY = 'dq_anon_tokens';
 
 // Colonne reports senza anon_token (REVOKE SELECT sulla colonna lato DB)
@@ -32,7 +18,7 @@ function saveAnonToken(token) {
   }
 }
 
-// ─── BOXES ─────────────────────────────────────────────────────────────────
+// BOXES
 
 /**
  * Campi pubblici di una box (view boxes_public).
@@ -110,7 +96,7 @@ export async function createBox({ slug, name, categories }) {
   return data;
 }
 
-// ─── PROFILES ──────────────────────────────────────────────────────────────
+// PROFILES
 
 /**
  * Legge il profilo dell'utente autenticato corrente.
@@ -178,13 +164,13 @@ export async function getBoxUsers(boxSlug) {
     .from('profiles')
     .select('*')
     .eq('box_slug', boxSlug)
-    .eq('role', 'student')
+    .in('role', ['student', 'banned'])
     .order('created_at', { ascending: false });
   if (error) throw error;
   return data || [];
 }
 
-// ─── REPORTS ───────────────────────────────────────────────────────────────
+// REPORTS
 
 /**
  * Legge le segnalazioni pubbliche di una box (Forum studenti).
@@ -354,7 +340,7 @@ export async function createReport({ boxSlug, type, title, content, isPublic, is
     boxSlug,
     reportId: data.id,
     title: 'Nuova segnalazione',
-    body: title,
+    body: 'È stata inviata una nuova segnalazione.',
     excludeUserId: user.id,
   });
 
@@ -381,7 +367,7 @@ export async function updateReport(reportId, updates) {
       boxSlug: data.box_slug,
       reportId,
       title: 'Aggiornamento segnalazione',
-      body: `Stato aggiornato: ${updates.status}`,
+      body: 'Lo stato della segnalazione è stato aggiornato.',
       excludeUserId: user?.id,
     });
   }
@@ -400,7 +386,7 @@ export async function deleteReport(reportId) {
   if (error) throw error;
 }
 
-// ─── COMMENTI (Forum pubblico) ──────────────────────────────────────────────
+// COMMENTI (Forum pubblico)
 
 /**
  * Legge i commenti di un post pubblico.
@@ -453,14 +439,14 @@ export async function addComment({ reportId, content, isAnonymous }) {
     boxSlug: report?.box_slug,
     reportId,
     title: 'Nuovo commento',
-    body: report?.title || content.slice(0, 80),
+    body: 'È stato aggiunto un nuovo commento al forum.',
     excludeUserId: user.id,
   });
 
   return data;
 }
 
-// ─── CHAT PRIVATA (admin ↔ studente identificato) ──────────────────────────
+// CHAT PRIVATA (admin ↔ studente identificato)
 
 /**
  * Legge i messaggi della chat privata di una segnalazione.
@@ -500,14 +486,14 @@ export async function sendChatMessage({ reportId, content }) {
     boxSlug: report?.box_slug,
     reportId,
     title: 'Nuovo messaggio',
-    body: report?.title || content.slice(0, 80),
+    body: 'Hai ricevuto un nuovo messaggio in chat.',
     excludeUserId: user.id,
   });
 
   return data;
 }
 
-// ─── CHAT PER SEGNALAZIONI ANONIME (via token localStorage) ────────────────
+// CHAT PER SEGNALAZIONI ANONIME (via token localStorage)
 
 /**
  * Legge la chat di una segnalazione anonima usando il token segreto.
@@ -541,7 +527,7 @@ export async function sendAnonChatMessage({ reportId, anonToken, content }) {
     boxSlug: report?.box_slug,
     reportId,
     title: 'Nuovo messaggio',
-    body: report?.title || content.slice(0, 80),
+    body: 'Hai ricevuto un nuovo messaggio in chat.',
     excludeUserId: user?.id,
   });
 
@@ -568,14 +554,14 @@ export async function updateAnonReportStatus(reportId, anonToken, status) {
     boxSlug: updated?.box_slug,
     reportId,
     title: 'Aggiornamento segnalazione',
-    body: `Stato aggiornato: ${status}`,
+    body: 'Lo stato della segnalazione è stato aggiornato.',
     excludeUserId: user?.id,
   });
 
   return updated;
 }
 
-// ─── VOTI ──────────────────────────────────────────────────────────────────
+// VOTI
 
 /**
  * Aggiunge o toglie il voto dell'utente corrente a una segnalazione.
@@ -618,4 +604,127 @@ export async function hasVoted(reportId) {
     .maybeSingle();
 
   return !!data;
+}
+
+// NOTIFICHE IN-APP
+
+/**
+ * Legge le ultime 30 notifiche dell'utente corrente.
+ */
+export async function getNotifications() {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return [];
+
+  const { data, error } = await supabase
+    .from('notifications')
+    .select('id, type, title, body, url, report_id, read, created_at')
+    .eq('user_id', user.id)
+    .order('created_at', { ascending: false })
+    .limit(30);
+
+  if (error) throw error;
+  return (data || []).map((n) => ({
+    ...n,
+    // Formato leggibile per il pannello
+    time: formatRelativeTime(n.created_at),
+    text: n.body || n.title,
+    reportId: n.report_id,
+  }));
+}
+
+/**
+ * Marca una singola notifica come letta.
+ */
+export async function markNotificationRead(id) {
+  const { error } = await supabase
+    .from('notifications')
+    .update({ read: true })
+    .eq('id', id);
+  if (error) throw error;
+}
+
+/**
+ * Marca tutte le notifiche non lette dell'utente come lette.
+ */
+export async function markAllNotificationsRead() {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return;
+
+  const { error } = await supabase
+    .from('notifications')
+    .update({ read: true })
+    .eq('user_id', user.id)
+    .eq('read', false);
+  if (error) throw error;
+}
+
+function formatRelativeTime(isoString) {
+  const diff = Date.now() - new Date(isoString).getTime();
+  const mins = Math.floor(diff / 60000);
+  if (mins < 1) return 'Ora';
+  if (mins < 60) return `${mins} min fa`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return `${hours} ore fa`;
+  const days = Math.floor(hours / 24);
+  if (days === 1) return 'Ieri';
+  return `${days} giorni fa`;
+}
+
+// ── FUNZIONI DISTRUTTIVE (GDPR) ──
+
+/**
+ * Anonimizzazione irreversibile dell'account studente (Diritto all'Oblio).
+ * Rimuove le PII (Personally Identificable Information) e la box associata.
+ * Le segnalazioni create rimarranno ma risulteranno di un "Utente Cancellato".
+ */
+export async function deleteMyProfile() {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error('Non autenticato');
+
+  const { error } = await supabase
+    .from('profiles')
+    .update({
+      nome: 'Account',
+      cognome: 'Eliminato',
+      classe: null,
+      box_slug: null,
+      role: 'deleted'
+    })
+    .eq('id', user.id);
+  
+  if (error) throw error;
+}
+
+/**
+ * Elimina tutte le segnalazioni di una box (solo admin).
+ * Utile per il reset di fine anno.
+ */
+export async function resetBox(slug) {
+  const { error } = await supabase
+    .from('reports')
+    .delete()
+    .eq('box_slug', slug);
+  if (error) throw error;
+}
+
+/**
+ * Elimina un'intera box (solo admin).
+ */
+export async function deleteBox(slug) {
+  const { error } = await supabase
+    .from('boxes')
+    .delete()
+    .eq('slug', slug);
+  if (error) throw error;
+}
+
+/**
+ * Blocca o sblocca un utente (solo admin).
+ */
+export async function toggleUserBan(userId, ban) {
+  const { error } = await supabase
+    .from('profiles')
+    .update({ role: ban ? 'banned' : 'student' })
+    .eq('id', userId);
+  if (error) throw error;
 }

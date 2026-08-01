@@ -9,9 +9,10 @@ import NotificationPrefs from '../../components/NotificationPrefs';
 import { downloadTextFile, reportsToCsv, supportMailto } from '../../utils/download';
 import {
   Shield, Download, Lock, HelpCircle,
-  ChevronRight, BadgeCheck, LogOut, User, ArrowLeft
+  ChevronRight, BadgeCheck, LogOut, User, ArrowLeft, AlertTriangle
 } from 'lucide-react';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
+import ConfirmModal from '../../components/ConfirmModal';
 
 function BrutRow({ icon: Icon, label, sublabel, right, onClick, disabled, title }) {
   const interactive = !!onClick && !disabled;
@@ -69,6 +70,7 @@ export default function AdminProfile({ email = 'admin@scuola.edu.it' }) {
   const [actionMsg, setActionMsg] = useState('');
   const [actionOk, setActionOk] = useState(true);
   const [busyAction, setBusyAction] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
 
   useEffect(() => {
     if (!isDemo && supabaseProfile) {
@@ -141,6 +143,25 @@ export default function AdminProfile({ email = 'admin@scuola.edu.it' }) {
       showAction(err?.message || 'Esportazione non riuscita.', 'error');
     } finally {
       setBusyAction(false);
+    }
+  };
+
+  const handleDeleteAdmin = async () => {
+    try {
+      if (!isDemo) {
+        const { deleteBox, deleteMyProfile } = await import('../../services/db');
+        if (boxSlug) await deleteBox(boxSlug);
+        await deleteMyProfile();
+      } else {
+        localStorage.removeItem(`dq_mock_admin_${boxSlug}`);
+      }
+      showAction("Profilo e sportello eliminati.", "success");
+      setTimeout(() => {
+        handleLogout();
+      }, 1500);
+    } catch (err) {
+      console.error(err);
+      showAction("Errore durante l'eliminazione del profilo.", "error");
     }
   };
 
@@ -314,10 +335,38 @@ export default function AdminProfile({ email = 'admin@scuola.edu.it' }) {
           title={isDemo ? 'Presto disponibile' : undefined}
           onClick={isDemo ? undefined : handleChangePassword}
         />
+      </div>
+
+      {/* Informazioni */}
+      <div style={{ fontSize: '0.68rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.09em', color: 'var(--b-gray)', marginBottom: 6, marginLeft: 2 }}>Informazioni</div>
+      <div style={{ border: '3px solid var(--b-black)', boxShadow: 'var(--b-shadow)', marginBottom: 24 }}>
+        <BrutRow icon={Shield} label="Termini di Servizio" onClick={() => window.open('/termini', '_blank')} />
+        <BrutRow icon={HelpCircle} label="Informativa sulla Privacy" onClick={() => window.open('/privacy', '_blank')} />
         <div style={{ borderBottom: 'none' }}>
           <BrutRow icon={HelpCircle} label="Assistenza Tecnica" onClick={handleSupport} />
         </div>
       </div>
+
+      {/* Danger Zone */}
+      <div style={{ fontSize: '0.68rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.09em', color: 'var(--b-red)', marginBottom: 6, marginLeft: 2, marginTop: 32 }}>Zona Pericolosa</div>
+      <button
+        onClick={() => setShowDeleteModal(true)}
+        style={{
+          display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+          width: '100%', padding: '14px 24px',
+          background: 'var(--b-red)', color: '#FFFFFF',
+          border: '3px solid var(--b-black)', fontWeight: 800,
+          cursor: 'pointer', fontSize: '0.9rem', textTransform: 'uppercase',
+          letterSpacing: '0.05em', boxShadow: '4px 4px 0 var(--b-black)',
+          transition: 'box-shadow 0.1s, transform 0.1s',
+          fontFamily: "'Space Grotesk', sans-serif",
+          marginBottom: 20
+        }}
+        onMouseEnter={e => { e.currentTarget.style.boxShadow = '6px 6px 0 var(--b-black)'; e.currentTarget.style.transform = 'translate(-1px,-1px)'; }}
+        onMouseLeave={e => { e.currentTarget.style.boxShadow = '4px 4px 0 var(--b-black)'; e.currentTarget.style.transform = 'none'; }}
+      >
+        <User size={17} strokeWidth={2.5} /> Elimina il mio Profilo
+      </button>
 
       {/* Logout */}
       <button
@@ -338,6 +387,16 @@ export default function AdminProfile({ email = 'admin@scuola.edu.it' }) {
       >
         <LogOut size={17} strokeWidth={2.5} /> Esci dall'Account
       </button>
+
+      <ConfirmModal
+        isOpen={showDeleteModal}
+        onClose={() => setShowDeleteModal(false)}
+        onConfirm={handleDeleteAdmin}
+        title="Elimina Profilo Admin"
+        message="ATTENZIONE ESTREMA: Stai per eliminare irreversibilmente il tuo profilo amministratore. Questo comporterà la distruzione immediata e definitiva dell'intero sportello scolastico e di TUTTE le segnalazioni al suo interno. L'operazione non può essere annullata. Vuoi procedere?"
+        confirmText="Elimina Definitivamente"
+        isDanger={true}
+      />
     </motion.div>
   );
 }

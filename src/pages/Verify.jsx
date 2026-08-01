@@ -18,12 +18,12 @@ const STEPS = [
 
 export default function Verify({ slug }) {
   // Preload del bundle principale in background
-  useEffect(() => { import('../bundles/AppBundle'); }, []);
+  // Removed AppBundle preloading
 
   const isDemo = slug === 'demo';
   const { loginStudent, sendStudentOtp, verifyStudentOtp, completeStudentProfile, logoutReal } = useAuth();
 
-  // ─── Stato comune ───────────────────────────────────────────────────────
+  // Stato comune
   const existingProfile = isDemo ? getStudentProfile() : {};
   const [email, setEmail] = useState(() =>
     localStorage.getItem(`dq_verify_email_${slug}`) ||
@@ -37,6 +37,7 @@ export default function Verify({ slug }) {
   const [loading, setLoading] = useState(false);
   const [boxState, setBoxState] = useState(isDemo ? 'found' : 'checking'); // 'checking' | 'found' | 'not_found'
   const [isClassRequired, setIsClassRequired] = useState(isDemo ? getSettings().requireClass : false);
+  const [acceptedTerms, setAcceptedTerms] = useState(false);
   const [msg, setMsg] = useState({ text: '', isSuccess: false });
   const [resendCooldown, setResendCooldown] = useState(0);
   const inputRefs = useRef([]);
@@ -108,7 +109,7 @@ export default function Verify({ slug }) {
       });
   }, [slug, isDemo]);
 
-  // ─── OTP Handlers ──────────────────────────────────────────────────────
+  // OTP Handlers
 
   const handleSendCode = async (e) => {
     e.preventDefault();
@@ -234,7 +235,7 @@ export default function Verify({ slug }) {
         // REALE: verifica OTP con Supabase
         await verifyStudentOtp(email, code);
 
-        // ── Separazione account: la box NON si naviga con l'account admin ──
+        // Separazione account: la box NON si naviga con l'account admin
         const prof = await getMyProfile();
         if (prof?.role === 'admin') {
           await logoutReal();
@@ -279,6 +280,10 @@ export default function Verify({ slug }) {
       setMsg({ text: 'Compila tutti i campi obbligatori', isSuccess: false });
       return;
     }
+    if (!acceptedTerms) {
+      setMsg({ text: 'Devi accettare i Termini di Servizio e la Privacy Policy per iscriverti.', isSuccess: false });
+      return;
+    }
     setLoading(true);
     try {
       if (isDemo) {
@@ -316,7 +321,7 @@ export default function Verify({ slug }) {
     }
   };
 
-  // ─── Render Schermata Caricamento ───────────────────────────────────────
+  // Render Schermata Caricamento
   if (boxState === 'checking') {
     return (
       <div className="app-container">
@@ -330,7 +335,7 @@ export default function Verify({ slug }) {
     );
   }
 
-  // ─── Render Schermata Box Non Trovata (404) ────────────────────────────
+  // Render Schermata Box Non Trovata (404)
   if (boxState === 'not_found') {
     return (
       <div className="app-container">
@@ -552,6 +557,20 @@ export default function Verify({ slug }) {
                     <input placeholder="Es. 3B" value={classe} onChange={(e) => setClasse(e.target.value)} required id="verify-classe" />
                   </>
                 )}
+                
+                <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, marginTop: 16, marginBottom: 8, textAlign: 'left' }}>
+                  <input 
+                    type="checkbox" 
+                    id="verify-terms-check" 
+                    checked={acceptedTerms} 
+                    onChange={e => setAcceptedTerms(e.target.checked)} 
+                    style={{ width: 18, height: 18, flexShrink: 0, marginTop: 2, cursor: 'pointer', accentColor: 'var(--b-black)' }}
+                  />
+                  <label htmlFor="verify-terms-check" style={{ fontSize: '0.85rem', color: 'var(--b-black)', fontWeight: 500, lineHeight: 1.4 }}>
+                    Dichiaro di aver letto e accetto i <a href="/termini" target="_blank" rel="noreferrer" style={{color: 'var(--b-black)', textDecoration: 'underline'}}>Termini di Servizio</a> e la <a href="/privacy" target="_blank" rel="noreferrer" style={{color: 'var(--b-black)', textDecoration: 'underline'}}>Privacy Policy</a>.
+                  </label>
+                </div>
+
                 <button type="submit" className="btn-primary" style={{ marginTop: 8 }} disabled={loading} id="verify-complete-btn">
                   {loading ? 'Salvataggio...' : 'Entra nello Sportello →'}
                 </button>

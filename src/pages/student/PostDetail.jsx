@@ -62,7 +62,7 @@ export default function PostDetail() {
   const profile = getStudentProfile();               // profilo mock (solo demo)
   const { profile: authProfile } = useAuth();        // profilo Supabase (reale)
 
-  // ── Post: demo = mock, reale = Supabase ───────────────────────────────
+  // Post: demo = mock, reale = Supabase
   const mockPost = useReportMock(postId);
   const [realPost, setRealPost] = useState(null);
   const [realComments, setRealComments] = useState([]);
@@ -288,12 +288,19 @@ export default function PostDetail() {
       </div>
 
       {/* Input commento */}
-      <div className="flat-panel" style={{
-        padding: '16px', marginBottom: 16,
-        background: isAnon ? 'var(--b-cream)' : undefined,
-        transition: 'background 0.25s',
-        border: isAnon ? '3px solid var(--b-black)' : undefined,
-      }}>
+      {authProfile?.role === 'banned' ? (
+        <div className="flat-panel" style={{ padding: '20px 16px', marginBottom: 16, background: '#ffebeb', border: '3px solid var(--b-red)', textAlign: 'center' }}>
+          <p style={{ margin: 0, color: 'var(--b-red)', fontWeight: 800, fontSize: '0.9rem', textTransform: 'uppercase' }}>
+            Non puoi commentare perché il tuo account è stato bloccato dai rappresentanti dello sportello.
+          </p>
+        </div>
+      ) : (
+        <div className="flat-panel" style={{
+          padding: '16px', marginBottom: 16,
+          background: isAnon ? 'var(--b-cream)' : undefined,
+          transition: 'background 0.25s',
+          border: isAnon ? '3px solid var(--b-black)' : undefined,
+        }}>
         <div style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
           {/* Wrapper textarea con watermark incognito */}
           <div style={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
@@ -471,6 +478,7 @@ export default function PostDetail() {
           )}
         </div>
       </div>
+      )}
 
       {/* Lista Commenti — sempre cronologico oldest → newest */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>

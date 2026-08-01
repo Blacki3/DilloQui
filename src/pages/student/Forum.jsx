@@ -213,7 +213,7 @@ export default function Forum() {
   const [filterTypes, setFilterTypes] = useState([]); // array vuoto = tutte
   const [sortOrder, setSortOrder] = useState('recent'); // recent, popular
 
-  // ── Dati: demo usa mock, reale usa Supabase ────────────────────────────
+  // Dati: demo usa mock, reale usa Supabase
   const mockPosts = useReportsMock().filter(r => r.isPublic);
   const [realPosts, setRealPosts] = useState([]);
   const [loadingPosts, setLoadingPosts] = useState(!isDemo);

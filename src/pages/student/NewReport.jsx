@@ -198,6 +198,31 @@ export default function NewReport() {
   const tipoInvalid = !!fieldErrors.tipo;
   const descInvalid = !!fieldErrors.problema;
 
+  if (profile?.role === 'banned') {
+    return (
+      <div style={{ maxWidth: 480, margin: '40px auto', textAlign: 'center' }}>
+        <div style={{ background: 'var(--b-red)', padding: '32px 24px', border: '3px solid var(--b-black)', color: '#fff', boxShadow: '8px 8px 0 var(--b-black)' }}>
+          <Shield size={48} strokeWidth={2.5} style={{ marginBottom: 16 }} />
+          <h2 style={{ textTransform: 'uppercase', marginBottom: 12, fontSize: '1.4rem' }}>Account Bloccato</h2>
+          <p style={{ fontWeight: 600, fontSize: '0.95rem', lineHeight: 1.5 }}>
+            Il tuo account è stato bloccato dai rappresentanti dello sportello. Non puoi più inviare segnalazioni o inserire commenti.
+          </p>
+          <button 
+            onClick={() => navigate(`/box/${slug}/forum`)} 
+            style={{ 
+              marginTop: 24, background: 'var(--b-white)', color: 'var(--b-black)', 
+              padding: '12px 24px', border: '2px solid var(--b-black)', 
+              fontWeight: 800, cursor: 'pointer', textTransform: 'uppercase',
+              boxShadow: '4px 4px 0 var(--b-black)'
+            }}
+          >
+            Torna alla bacheca
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <form onSubmit={handleInvia} className="new-report-grid" noValidate>
 
@@ -251,7 +276,7 @@ export default function NewReport() {
             fontSize: '0.82rem', fontWeight: 700,
           }}>
             <Shield size={16} strokeWidth={2.5} style={{ flexShrink: 0 }} />
-            <span>La tua identità non è collegata a questa segnalazione — gli amministratori non vedono il tuo nome.</span>
+            <span>Modalità anonima attiva: i referenti dello sportello leggeranno il messaggio ma non vedranno il tuo nome.</span>
           </div>
         )}
       </div>

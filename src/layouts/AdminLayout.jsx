@@ -7,6 +7,8 @@ import BrandWordmark from '../components/BrandWordmark';
 import { useUnreadReportCount } from '../services/mockStore';
 import { countNewStatus, useAdminReadVersionReal } from '../services/adminReadStore';
 import { getAllReports } from '../services/db';
+import { usePolling } from '../hooks/usePolling';
+import { Dashboard, ReportsList, Settings, UsersList, AdminProfile } from '../App';
 
 const SIDEBAR_COLLAPSED_KEY = 'dq_admin_sidebar_collapsed';
 
@@ -43,27 +45,53 @@ export default function AdminLayout() {
   }, [sidebarCollapsed]);
 
   useEffect(() => {
-    const handler = (e) => { if (profileRef.current && !profileRef.current.contains(e.target)) setShowProfile(false); };
-    document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
+    const handler = (e) => { 
+      if (profileRef.current && !profileRef.current.contains(e.target)) {
+        setShowProfile(false); 
+      }
+    };
+    document.addEventListener('pointerdown', handler);
+    return () => document.removeEventListener('pointerdown', handler);
+  }, []);
+
+  // Chiudi il menu mobile al cambio rotta
+  useEffect(() => {
+    setIsMenuOpen(false);
+  }, [location.pathname]);
+
+  // Preload in background delle altre rotte Admin
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      Dashboard.preload?.();
+      ReportsList.preload?.();
+      Settings.preload?.();
+      UsersList.preload?.();
+      AdminProfile.preload?.();
+    }, 1500);
+    return () => clearTimeout(timer);
   }, []);
 
   // Badge reale: conteggio leggero status===new (si aggiorna al cambio rotta / mark-read)
-  useEffect(() => {
+  const fetchBadgeCount = () => {
     if (isDemo || !boxSlug) {
       setRealNewCount(0);
-      return;
+      return Promise.resolve();
     }
-    let cancelled = false;
-    getAllReports(boxSlug)
+    return getAllReports(boxSlug)
       .then((data) => {
-        if (!cancelled) setRealNewCount(countNewStatus(data || []));
+        setRealNewCount(countNewStatus(data || []));
       })
       .catch(() => {
-        if (!cancelled) setRealNewCount(0);
+        setRealNewCount(0);
       });
-    return () => { cancelled = true; };
+  };
+
+  useEffect(() => {
+    fetchBadgeCount();
   }, [isDemo, boxSlug, location.pathname, realReadVersion]);
+
+  // Polling in background ogni 15 secondi per i contatori
+  usePolling(fetchBadgeCount, 15000);
 
   const mockUnreadReportCount = useUnreadReportCount();
   const unreadReportCount = isDemo ? mockUnreadReportCount : realNewCount;
@@ -87,10 +115,22 @@ export default function AdminLayout() {
   const NavLinks = () => (
     <>
       {menu.map((item) => (
-        <Link
+        <a
           key={item.path}
-          onClick={() => setIsMenuOpen(false)}
-          to={item.path}
+          href={item.path}
+          onClick={(e) => {
+            e.preventDefault();
+            if (location.pathname === item.path) {
+              setIsMenuOpen(false);
+              return;
+            }
+            if (isMenuOpen) {
+              setIsMenuOpen(false);
+              setTimeout(() => navigate(item.path), 350);
+            } else {
+              navigate(item.path);
+            }
+          }}
           className={`admin-nav-link ${isActive(item.path) ? 'active' : ''}`}
           style={{ cursor: 'pointer', borderRight: 'none' }}
           id={`admin-nav-${item.name.toLowerCase()}`}
@@ -109,7 +149,7 @@ export default function AdminLayout() {
               {item.badge}
             </span>
           )}
-        </Link>
+        </a>
       ))}
     </>
   );
@@ -198,7 +238,15 @@ export default function AdminLayout() {
                   className={`profile-popup admin-profile-popup${sidebarCollapsed ? ' admin-profile-popup--collapsed' : ''}`} 
                   id="admin-profile-menu"
                 >
-                  <button className="profile-popup-item" onClick={() => { setShowProfile(false); navigate(`${basePath}/profile`); }}>
+                  <button className="profile-popup-item" onClick={() => { 
+                    setShowProfile(false); 
+                    if (isMenuOpen) {
+                      setIsMenuOpen(false);
+                      setTimeout(() => navigate(`${basePath}/profile`), 350);
+                    } else {
+                      navigate(`${basePath}/profile`); 
+                    }
+                  }}>
                     <User size={15} /> Il mio Profilo
                   </button>
                   <div className="profile-popup-divider" />

@@ -107,6 +107,7 @@ export function blockUser(userId, blockStatus) {
   const index = users.findIndex(u => u.id === userId);
   if (index !== -1) {
     users[index].status = blockStatus ? 'blocked' : 'active';
+    users[index].role = blockStatus ? 'banned' : 'student';
     saveAllUsers(users);
   }
 }
