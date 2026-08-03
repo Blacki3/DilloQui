@@ -1,12 +1,12 @@
 import { Link, useLocation, useNavigate, useOutlet } from 'react-router-dom';
-import { LayoutDashboard, Settings as SettingsIcon, MessageSquareWarning, LogOut, Menu, X, User, PanelLeftClose, PanelLeftOpen, Users } from 'lucide-react';
+import { LayoutDashboard, Settings as SettingsIcon, MessageSquareWarning, LogOut, Menu, X, User, PanelLeftClose, PanelLeftOpen, Users, BadgeCheck } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '../context/AuthContext';
 import { useState, useRef, useEffect } from 'react';
 import BrandWordmark from '../components/BrandWordmark';
 import { useUnreadReportCount } from '../services/mockStore';
-import { countNewStatus, useAdminReadVersionReal } from '../services/adminReadStore';
-import { getAllReports } from '../services/db';
+import { useAdminReadVersionReal } from '../services/adminReadStore';
+import { countNewReports } from '../services/db';
 import { usePolling } from '../hooks/usePolling';
 import { Dashboard, ReportsList, Settings, UsersList, AdminProfile } from '../App';
 
@@ -23,7 +23,7 @@ function readSidebarCollapsed() {
 export default function AdminLayout() {
   const location = useLocation();
   const navigate = useNavigate();
-  const { logoutAdmin, logoutReal, profile } = useAuth();
+  const { logoutAdmin, logoutReal, profile, isPlatformAdmin } = useAuth();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(readSidebarCollapsed);
   const [showProfile, setShowProfile] = useState(false);
@@ -77,10 +77,8 @@ export default function AdminLayout() {
       setRealNewCount(0);
       return Promise.resolve();
     }
-    return getAllReports(boxSlug)
-      .then((data) => {
-        setRealNewCount(countNewStatus(data || []));
-      })
+    return countNewReports(boxSlug)
+      .then(setRealNewCount)
       .catch(() => {
         setRealNewCount(0);
       });
@@ -106,6 +104,11 @@ export default function AdminLayout() {
     { name: 'Segnalazioni', path: `${basePath}/reports`,   icon: MessageSquareWarning, badge: unreadReportCount },
     { name: 'Utenti',       path: `${basePath}/users`,     icon: Users },
     { name: 'Impostazioni', path: `${basePath}/settings`,  icon: SettingsIcon },
+    // Gestione della piattaforma, non della scuola: fuori dalla demo e
+    // solo per chi verifica gli sportelli
+    ...(!isDemo && isPlatformAdmin
+      ? [{ name: 'Sportelli', path: `${basePath}/piattaforma`, icon: BadgeCheck }]
+      : []),
   ];
 
   const isActive = (path) => location.pathname.includes(path);

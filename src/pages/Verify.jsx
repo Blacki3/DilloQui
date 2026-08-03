@@ -37,6 +37,8 @@ export default function Verify({ slug }) {
   const [loading, setLoading] = useState(false);
   const [boxState, setBoxState] = useState(isDemo ? 'found' : 'checking'); // 'checking' | 'found' | 'not_found'
   const [isClassRequired, setIsClassRequired] = useState(isDemo ? getSettings().requireClass : false);
+  const [isBoxVerified, setIsBoxVerified] = useState(true);
+  const [isBoxSuspended, setIsBoxSuspended] = useState(false);
   const [acceptedTerms, setAcceptedTerms] = useState(false);
   const [msg, setMsg] = useState({ text: '', isSuccess: false });
   const [resendCooldown, setResendCooldown] = useState(0);
@@ -99,6 +101,9 @@ export default function Verify({ slug }) {
         if (box) {
           setBoxState('found');
           setIsClassRequired(box.require_class);
+          // Il flag manca finché P3 non è applicata: in quel caso non allarmare.
+          setIsBoxVerified(box.verified !== false);
+          setIsBoxSuspended(box.suspended === true);
         } else {
           setBoxState('not_found');
         }
@@ -281,7 +286,7 @@ export default function Verify({ slug }) {
       return;
     }
     if (!acceptedTerms) {
-      setMsg({ text: 'Devi accettare i Termini di Servizio e la Privacy Policy per iscriverti.', isSuccess: false });
+      setMsg({ text: 'Per iscriverti devi avere almeno 14 anni e accettare i Termini di Servizio e la Privacy Policy.', isSuccess: false });
       return;
     }
     setLoading(true);
@@ -446,6 +451,49 @@ export default function Verify({ slug }) {
             <span style={{ color: 'var(--b-black)', fontWeight: 800 }}>{slug?.toLowerCase()}</span>
           </div>
 
+          {isBoxSuspended && (
+            <div
+              role="status"
+              style={{
+                display: 'flex', alignItems: 'flex-start', gap: 10, textAlign: 'left',
+                background: 'var(--b-red)', color: 'var(--b-white)',
+                border: '3px solid var(--b-black)', boxShadow: 'var(--b-shadow-sm)',
+                padding: '12px 14px', marginBottom: 20,
+              }}
+            >
+              <AlertCircle size={18} strokeWidth={2.5} style={{ flexShrink: 0, marginTop: 1 }} />
+              <div style={{ fontSize: '0.82rem', lineHeight: 1.45, fontWeight: 600 }}>
+                <strong style={{ display: 'block', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 3 }}>
+                  Sportello sospeso
+                </strong>
+                Questo sportello non accetta nuove segnalazioni. Se hai bisogno di parlare
+                con qualcuno adesso, chiama il <strong>114</strong> (Emergenza Infanzia,
+                gratuito e attivo 24 ore su 24) oppure il <strong>1522</strong>.
+              </div>
+            </div>
+          )}
+
+          {!isBoxSuspended && !isBoxVerified && (
+            <div
+              role="status"
+              style={{
+                display: 'flex', alignItems: 'flex-start', gap: 10, textAlign: 'left',
+                background: 'var(--b-orange)', color: 'var(--b-white)',
+                border: '3px solid var(--b-black)', boxShadow: 'var(--b-shadow-sm)',
+                padding: '12px 14px', marginBottom: 20,
+              }}
+            >
+              <AlertCircle size={18} strokeWidth={2.5} style={{ flexShrink: 0, marginTop: 1 }} />
+              <div style={{ fontSize: '0.82rem', lineHeight: 1.45, fontWeight: 600 }}>
+                <strong style={{ display: 'block', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 3 }}>
+                  Sportello non verificato
+                </strong>
+                Non abbiamo ancora confermato che sia stato aperto dai rappresentanti della tua scuola.
+                Accedi solo se ti è stato segnalato da qualcuno di cui ti fidi.
+              </div>
+            </div>
+          )}
+
           {/* ── Step 1: Email ── */}
           {step === 1 && (
             <>
@@ -567,7 +615,7 @@ export default function Verify({ slug }) {
                     style={{ width: 18, height: 18, flexShrink: 0, marginTop: 2, cursor: 'pointer', accentColor: 'var(--b-black)' }}
                   />
                   <label htmlFor="verify-terms-check" style={{ fontSize: '0.85rem', color: 'var(--b-black)', fontWeight: 500, lineHeight: 1.4 }}>
-                    Dichiaro di aver letto e accetto i <a href="/termini" target="_blank" rel="noreferrer" style={{color: 'var(--b-black)', textDecoration: 'underline'}}>Termini di Servizio</a> e la <a href="/privacy" target="_blank" rel="noreferrer" style={{color: 'var(--b-black)', textDecoration: 'underline'}}>Privacy Policy</a>.
+                    Dichiaro di avere <strong>almeno 14 anni</strong>, di aver letto e di accettare i <a href="/termini" target="_blank" rel="noreferrer" style={{color: 'var(--b-black)', textDecoration: 'underline'}}>Termini di Servizio</a> e la <a href="/privacy" target="_blank" rel="noreferrer" style={{color: 'var(--b-black)', textDecoration: 'underline'}}>Privacy Policy</a>.
                   </label>
                 </div>
 

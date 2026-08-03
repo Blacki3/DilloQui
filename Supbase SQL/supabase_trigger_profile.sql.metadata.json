@@ -1,5 +1,0 @@
-{
-  "summary": "Trigger SQL da eseguire su Supabase per la creazione automatica dei profili studente al primo login OTP.",
-  "updatedAt": "2026-07-22T10:59:22.050583400Z",
-  "userFacing": true
-}

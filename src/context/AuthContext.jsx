@@ -11,6 +11,10 @@ export function AuthProvider({ children }) {
   // Soft flag: fetch profilo fallito (non lascia null silenzioso per sempre)
   const [profileError, setProfileError] = useState(null);
   const [isRecoveringPassword, setIsRecoveringPassword] = useState(false);
+  // Gestore della piattaforma (verifica gli sportelli), non della singola scuola.
+  // Serve solo a decidere cosa mostrare: ogni azione ricontrolla il permesso lato server.
+  // null finché la verifica non risponde, per non lampeggiare "area riservata".
+  const [isPlatformAdmin, setIsPlatformAdmin] = useState(null);
 
   // Stato mock per la Demo
   const [adminToken, setAdminToken] = useState(() => localStorage.getItem('adminToken') || '');
@@ -107,6 +111,19 @@ export function AuthProvider({ children }) {
     const { data: { user } } = await supabase.auth.getUser();
     if (user) await fetchProfile(user.id);
   };
+
+  const userId = session?.user?.id;
+  useEffect(() => {
+    if (!userId) {
+      setIsPlatformAdmin(false);
+      return;
+    }
+    let cancelled = false;
+    supabase.rpc('am_i_platform_admin').then(({ data, error }) => {
+      if (!cancelled) setIsPlatformAdmin(!error && data === true);
+    });
+    return () => { cancelled = true; };
+  }, [userId]);
 
   // AUTH REALE: Studenti (OTP via email)
 
@@ -252,7 +269,8 @@ export function AuthProvider({ children }) {
       throw new Error('Registrazione creata ma sessione non attiva: se in Supabase è attiva la conferma email, disattivala o conferma l\'email prima di riprovare il login.');
     }
 
-    // 4. Crea box + promuovi ad admin in un'unica RPC (atomica, anti-hijack slug)
+    // 4. Crea box + promuovi ad admin in un'unica RPC (atomica, anti-hijack slug).
+    //    Lo stato di verifica della box lo decide il database dal dominio email.
     const { data: profileData, error: rpcError } = await supabase.rpc('become_admin_and_link_box', {
       p_slug: slug,
       p_name: nomeSportello,
@@ -281,10 +299,20 @@ export function AuthProvider({ children }) {
    * Logout reale (sia studente che admin su Supabase).
    */
   const logoutReal = async () => {
+    // Chiude lo sblocco del pannello prima di perdere il token, altrimenti
+    // resterebbe valido fino alla scadenza dopo un nuovo accesso
+    if (isPlatformAdmin) {
+      try {
+        await supabase.rpc('platform_lock');
+      } catch {
+        /* scade comunque da solo */
+      }
+    }
     await supabase.auth.signOut();
     setSession(null);
     setProfile(null);
     setProfileError(null);
+    setIsPlatformAdmin(false);
   };
 
   // AUTH MOCK: Demo (invariato rispetto all'Alpha 0.5)
@@ -337,6 +365,7 @@ export function AuthProvider({ children }) {
       isRealAdminAuthenticated,
       isAdminAuthenticated,
       isStudentAuthenticated,
+      isPlatformAdmin,
     }}>
       {children}
     </AuthContext.Provider>

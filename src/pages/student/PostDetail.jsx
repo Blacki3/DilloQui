@@ -15,6 +15,7 @@ import {
 import { getStudentProfile } from '../../services/mockProfiles';
 import { getReport, getComments, addComment as addCommentReal, toggleVote, hasVoted } from '../../services/db';
 import { useAuth } from '../../context/AuthContext';
+import { usePolling } from '../../hooks/usePolling';
 
 /* Icona incognito da public/incognito-svgrepo-com.svg — inline per poter
    usare currentColor e scalare con la prop size */
@@ -68,10 +69,9 @@ export default function PostDetail() {
   const [realComments, setRealComments] = useState([]);
   const [loadingPost, setLoadingPost] = useState(!isDemo);
 
-  useEffect(() => {
-    if (isDemo) return;
-    setLoadingPost(true);
-    Promise.all([getReport(postId), getComments(postId), hasVoted(postId)])
+  const fetchPost = () => {
+    if (isDemo) return Promise.resolve();
+    return Promise.all([getReport(postId), getComments(postId), hasVoted(postId)])
       .then(([post, comments, voted]) => {
         setRealPost({
           ...post,
@@ -94,9 +94,19 @@ export default function PostDetail() {
           createdAt: new Date(c.created_at).getTime(),
         })));
       })
-      .catch(console.error)
-      .finally(() => setLoadingPost(false));
+      .catch(console.error);
+  };
+
+  useEffect(() => {
+    if (isDemo) return;
+    setLoadingPost(true);
+    fetchPost().finally(() => setLoadingPost(false));
   }, [isDemo, postId]);
+
+  // Le risposte degli altri arrivano mentre stai leggendo la discussione.
+  // Il commento appena scritto è già in lista: al giro successivo viene
+  // sostituito dalla versione del server, con lo stesso id.
+  usePolling(fetchPost, 30000);
 
   // In modalità reale i commenti vivono in realComments: li innestiamo nel post
   const post = isDemo

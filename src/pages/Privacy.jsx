@@ -44,16 +44,31 @@ export default function Privacy() {
               </p>
 
               <h2 style={{ fontSize: '1.5rem', fontWeight: 800, marginTop: 40, marginBottom: 16, textTransform: 'uppercase' }}>
-                2. L'Anonimato su DilloQui (Pseudo-Anonimato)
+                2. Requisito di Età: 14 Anni
+              </h2>
+              <p>
+                Per iscriverti a DILLOQUI devi avere <strong>almeno 14 anni compiuti</strong>. È la soglia fissata in Italia dall'art. 2-quinquies del Codice Privacy (D.Lgs. 196/2003, come modificato dal D.Lgs. 101/2018): sotto quell'età il consenso al trattamento dei dati in un servizio digitale deve essere prestato da chi esercita la responsabilità genitoriale, e DilloQui non raccoglie né gestisce quel tipo di consenso.
+                <br /><br />
+                Dichiari di soddisfare il requisito nel momento in cui completi l'iscrizione. Se veniamo a sapere che un account appartiene a una persona più giovane, lo chiudiamo ed eliminiamo i dati collegati. Se sei un genitore o un insegnante e ritieni che un minore di 14 anni si sia iscritto, scrivici: provvediamo.
+                <br /><br />
+                <strong>Se hai meno di 14 anni e hai bisogno di parlare con qualcuno adesso</strong>, chiama il <strong>114 — Emergenza Infanzia</strong>: è gratuito, attivo 24 ore su 24 e risponde personale formato. Non ti serve nessun account.
+              </p>
+
+              <h2 style={{ fontSize: '1.5rem', fontWeight: 800, marginTop: 40, marginBottom: 16, textTransform: 'uppercase' }}>
+                3. L'Anonimato su DilloQui (Pseudo-Anonimato)
               </h2>
               <p>
                 Quando invii una segnalazione spuntando la casella "Anonimo", la piattaforma garantisce che <strong>il tuo nome non verrà mai mostrato ai Rappresentanti</strong> che leggono il messaggio. Sulla loro bacheca apparirai semplicemente come "Anonimo".
                 <br /><br />
-                Tuttavia, per garantire la sicurezza di tutti e prevenire abusi gravi (es. minacce, cyberbullismo, falsi allarmi), il sistema associa internamente la tua segnalazione a un identificativo crittografato (ID Utente). Questo meccanismo tecnico (chiamato <em>Pseudo-anonimato</em>) fa sì che, esclusivamente in caso di indagini per <strong>reati penali o grave pericolo per l'incolumità personale</strong>, l'identità possa essere decriptata e fornita <strong>solo ed esclusivamente alle Forze dell'Ordine o all'Autorità Giudiziaria</strong> dietro formale richiesta.
+                <strong>Vogliamo essere chiari fino in fondo: l'anonimato è verso la tua scuola, non verso l'infrastruttura.</strong> Il sistema conserva, in una tabella separata e protetta, un collegamento tra il tuo account e le segnalazioni che hai inviato. Serve a farti arrivare le notifiche quando qualcuno risponde e a farti ritrovare le tue segnalazioni anonime anche se cambi dispositivo. Questo collegamento <strong>non è leggibile dai Rappresentanti né dagli altri studenti</strong>: il database lo rende inaccessibile a chiunque acceda con un account scolastico. Vi accedono solo i processi automatici del server e, per manutenzione, il team tecnico di DilloQui.
+                <br /><br />
+                Questo meccanismo (chiamato <em>Pseudo-anonimato</em>) serve anche a prevenire abusi gravi (es. minacce, cyberbullismo, falsi allarmi) e fa sì che, esclusivamente in caso di indagini per <strong>reati penali o grave pericolo per l'incolumità personale</strong>, l'identità possa essere ricostruita e fornita <strong>solo ed esclusivamente alle Forze dell'Ordine o all'Autorità Giudiziaria</strong> dietro formale richiesta.
+                <br /><br />
+                Se hai bisogno di un canale che non conservi alcun collegamento con la tua identità, rivolgiti alle linee di ascolto nazionali per minori, che offrono supporto in forma completamente anonima.
               </p>
 
               <h2 style={{ fontSize: '1.5rem', fontWeight: 800, marginTop: 40, marginBottom: 16, textTransform: 'uppercase' }}>
-                3. Quali Dati Raccogliamo e Base Giuridica
+                4. Quali Dati Raccogliamo e Base Giuridica
               </h2>
               <p>
                 Raccogliamo il minimo indispensabile per far funzionare il servizio. Il trattamento si basa sul <strong>legittimo interesse</strong> di garantire la sicurezza informatica e sulla <strong>necessità contrattuale</strong> di fornire il servizio richiesto (erogazione della messaggistica).
@@ -65,7 +80,7 @@ export default function Privacy() {
               </ul>
 
               <h2 style={{ fontSize: '1.5rem', fontWeight: 800, marginTop: 40, marginBottom: 16, textTransform: 'uppercase' }}>
-                4. Titolare e Responsabili del Trattamento (GDPR)
+                5. Titolare e Responsabili del Trattamento (GDPR)
               </h2>
               <p>
                 <strong>Titolare del Trattamento:</strong> Ai fini normativi, la singola Box scolastica e i dati in essa contenuti sono gestiti dai Rappresentanti che l'hanno creata (nel ruolo di Titolari autonomi del trattamento dei dati inseriti volontariamente dai compagni). DilloQui opera come fornitore tecnologico dell'infrastruttura.
@@ -75,23 +90,25 @@ export default function Privacy() {
               </p>
 
               <h2 style={{ fontSize: '1.5rem', fontWeight: 800, marginTop: 40, marginBottom: 16, textTransform: 'uppercase' }}>
-                5. Chi ha accesso ai tuoi dati?
+                6. Chi ha accesso ai tuoi dati?
               </h2>
               <p>
-                <strong>I Rappresentanti (Admin della Box):</strong> Vedono il contenuto delle segnalazioni. Vedono il tuo nome e classe <em>solo</em> se scegli di non usare la modalità anonima. Non hanno mai accesso alla tua email o al tuo ID crittografato.<br />
+                <strong>I Rappresentanti (Admin della Box):</strong> Vedono il contenuto delle segnalazioni. Vedono il tuo nome e classe <em>solo</em> se scegli di non usare la modalità anonima. Non hanno mai accesso alla tua email né al collegamento interno descritto al punto 2.<br />
                 <strong>Il Team DILLOQUI:</strong> Ha accesso ai log di sistema esclusivamente per manutenzione tecnica e non legge le conversazioni private se non richiesto dalle Autorità.<br />
                 <strong>Autorità Giudiziarie:</strong> In caso di mandato ufficiale per la prevenzione o repressione di reati.
               </p>
 
               <h2 style={{ fontSize: '1.5rem', fontWeight: 800, marginTop: 40, marginBottom: 16, textTransform: 'uppercase' }}>
-                6. Conservazione dei Dati (Data Retention)
+                7. Conservazione dei Dati (Data Retention)
               </h2>
               <p>
-                I dati vengono conservati sui server europei di Supabase per il tempo strettamente necessario a erogare il servizio (durata dell'anno scolastico in corso). Al termine dell'anno scolastico, le Box possono essere svuotate dai Rappresentanti. In ogni caso, gli account inattivi e le relative segnalazioni vengono automaticamente eliminati dai nostri sistemi dopo 24 mesi dall'ultimo accesso.
+                I dati vengono conservati sui server europei di Supabase per il tempo strettamente necessario a erogare il servizio (durata dell'anno scolastico in corso). Al termine dell'anno scolastico, le Box possono essere svuotate dai Rappresentanti. In ogni caso, gli account inattivi e le relative segnalazioni vengono eliminati dai nostri sistemi entro 24 mesi dall'ultimo accesso.
+                <br /><br />
+                Non devi aspettare quel termine: dalla schermata del tuo profilo puoi <strong>eliminare l'account quando vuoi</strong>. L'account e i dati che ti identificano spariscono subito e in modo irreversibile; le segnalazioni che avevi pubblicato sul forum restano visibili ma perdono ogni collegamento con te, così le discussioni a cui hanno partecipato altri compagni non si svuotano.
               </p>
 
               <h2 style={{ fontSize: '1.5rem', fontWeight: 800, marginTop: 40, marginBottom: 16, textTransform: 'uppercase' }}>
-                7. I Tuoi Diritti (Art. 15-22 GDPR)
+                8. I Tuoi Diritti (Art. 15-22 GDPR)
               </h2>
               <p>
                 Il Regolamento Europeo ti garantisce il controllo totale sui tuoi dati personali. In qualsiasi momento hai il diritto di:

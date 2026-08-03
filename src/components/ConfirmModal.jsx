@@ -1,7 +1,10 @@
 import { motion, AnimatePresence } from 'framer-motion';
 import { AlertTriangle } from 'lucide-react';
+import { useDialog } from '../hooks/useDialog';
 
 export default function ConfirmModal({ isOpen, onClose, onConfirm, title, message, confirmText = 'Conferma', cancelText = 'Annulla', isDanger = true }) {
+  const dialogRef = useDialog(isOpen, onClose);
+
   return (
     <AnimatePresence>
       {isOpen && (
@@ -12,6 +15,11 @@ export default function ConfirmModal({ isOpen, onClose, onConfirm, title, messag
           padding: 20
         }}>
           <motion.div
+            ref={dialogRef}
+            role="dialog"
+            aria-modal="true"
+            aria-label={title}
+            tabIndex={-1}
             initial={{ opacity: 0, scale: 0.95, y: 10 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: 10 }}
@@ -19,7 +27,7 @@ export default function ConfirmModal({ isOpen, onClose, onConfirm, title, messag
             style={{
               background: 'var(--b-cream)', border: '4px solid var(--b-black)',
               boxShadow: 'var(--b-shadow)', padding: 24, maxWidth: 440, width: '100%',
-              position: 'relative'
+              position: 'relative', outline: 'none'
             }}
           >
             <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 18 }}>

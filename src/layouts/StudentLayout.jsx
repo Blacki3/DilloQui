@@ -1,12 +1,13 @@
 import { Link, useLocation, useParams, useNavigate, useOutlet } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Home, PlusCircle, History, Bell, User, FileText, TrendingUp, ScrollText } from 'lucide-react';
+import { Home, PlusCircle, History, Bell, User, FileText, TrendingUp, ScrollText, AlertTriangle } from 'lucide-react';
 import { useState, useRef, useEffect } from 'react';
 import BrandWordmark from '../components/BrandWordmark';
 import { countDrafts } from '../services/draftStore';
 import { useNotifications, markAllNotificationsRead as mockMarkAllRead, markNotificationRead as mockMarkRead } from '../services/mockStore';
 import { useAuth } from '../context/AuthContext';
 import {
+  getBox,
   getNotifications,
   markNotificationRead as dbMarkRead,
   markAllNotificationsRead as dbMarkAllRead,
@@ -42,6 +43,20 @@ export default function StudentLayout() {
 
   useEffect(() => { fetchNotifications(); }, [isDemo]);
   usePolling(fetchNotifications, 30000);
+
+  // Sportello non ancora verificato: lo studente deve saperlo mentre lo usa,
+  // non solo al momento dell'iscrizione.
+  const [boxVerified, setBoxVerified] = useState(true);
+  const [boxSuspended, setBoxSuspended] = useState(false);
+  useEffect(() => {
+    if (isDemo) return;
+    getBox(slug)
+      .then(box => {
+        setBoxVerified(box?.verified !== false);
+        setBoxSuspended(box?.suspended === true);
+      })
+      .catch(() => {});
+  }, [slug, isDemo]);
 
   // Realtime: nuova notifica arriva istantaneamente
   useEffect(() => {
@@ -244,6 +259,36 @@ export default function StudentLayout() {
           </div>
         </div>
       </nav>
+
+      {boxSuspended ? (
+        <div
+          role="status"
+          style={{
+            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+            background: 'var(--b-red)', color: 'var(--b-white)',
+            borderBottom: '3px solid var(--b-black)',
+            padding: '8px 16px', fontSize: '0.76rem', fontWeight: 700,
+            lineHeight: 1.35, textAlign: 'center',
+          }}
+        >
+          <AlertTriangle size={15} strokeWidth={2.5} style={{ flexShrink: 0 }} />
+          <span>Sportello sospeso: puoi rileggere quello che hai scritto, ma non inviare nulla di nuovo</span>
+        </div>
+      ) : !boxVerified && (
+        <div
+          role="status"
+          style={{
+            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+            background: 'var(--b-orange)', color: 'var(--b-white)',
+            borderBottom: '3px solid var(--b-black)',
+            padding: '8px 16px', fontSize: '0.76rem', fontWeight: 700,
+            lineHeight: 1.35, textAlign: 'center',
+          }}
+        >
+          <AlertTriangle size={15} strokeWidth={2.5} style={{ flexShrink: 0 }} />
+          <span>Sportello non ancora verificato da DilloQui</span>
+        </div>
+      )}
 
       {/* Main content */}
       <main style={{ flex: 1, display: 'flex', flexDirection: 'column', width: '100%' }}>

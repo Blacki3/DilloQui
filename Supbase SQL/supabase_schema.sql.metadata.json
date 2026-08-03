@@ -1,5 +1,0 @@
-{
-  "summary": "Schema SQL aggiornato con sistema di anonimato tramite token casuale lato client. Include tabelle, indici, vincoli di integrità, VIEW per admin e seed data.",
-  "updatedAt": "2026-07-20T22:21:04.316337100Z",
-  "userFacing": true
-}

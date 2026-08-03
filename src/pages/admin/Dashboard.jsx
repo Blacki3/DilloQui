@@ -1,7 +1,7 @@
 import { useMemo, useState, useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
-import { QrCode, TrendingUp, FileText, Users, CheckCircle } from 'lucide-react';
+import { QrCode, TrendingUp, FileText, Users, CheckCircle, AlertTriangle } from 'lucide-react';
 import { motion } from 'framer-motion';
 import Popup from '../../components/Popup';
 import CopyLinkButton from '../../components/CopyLinkButton';
@@ -77,7 +77,11 @@ function useAdminReports(isDemo, boxSlug) {
       return;
     }
     setLoadingReal(true);
-    getAllReports(boxSlug)
+    // Grafici e schede coprono al massimo l'ultimo mese: scaricare lo
+    // storico intero servirebbe solo a farlo scartare dai filtri.
+    const da = new Date();
+    da.setDate(da.getDate() - (PERIOD_DAYS.mensile + 1));
+    getAllReports(boxSlug, { since: da.toISOString(), limit: null })
       .then(data => {
         setRealReports(data.map(r => ({
           ...r,
@@ -112,6 +116,8 @@ export default function Dashboard() {
       ? (getSettings().categories?.length ? getSettings().categories : DEFAULT_CATEGORIES)
       : DEFAULT_CATEGORIES,
   );
+  const [boxVerified, setBoxVerified] = useState(true);
+  const [boxSuspended, setBoxSuspended] = useState(false);
 
   useEffect(() => {
     if (isDemo) {
@@ -124,6 +130,8 @@ export default function Dashboard() {
       .then((box) => {
         if (box?.categories?.length) setCategories(box.categories);
         else setCategories(DEFAULT_CATEGORIES);
+        setBoxVerified(box?.verified !== false);
+        setBoxSuspended(box?.suspended === true);
       })
       .catch(console.error);
   }, [isDemo, boxSlug]);
@@ -266,6 +274,48 @@ export default function Dashboard() {
           </button>
         </div>
       </div>
+
+      {boxSuspended && (
+        <div
+          className="flat-panel"
+          style={{
+            display: 'flex', alignItems: 'flex-start', gap: 12,
+            padding: '16px 18px', marginBottom: 20,
+            background: 'var(--b-red)', color: 'var(--b-white)',
+          }}
+        >
+          <AlertTriangle size={20} strokeWidth={2.5} style={{ flexShrink: 0, marginTop: 2 }} />
+          <div style={{ fontSize: '0.86rem', lineHeight: 1.5, fontWeight: 600 }}>
+            <strong style={{ display: 'block', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 4 }}>
+              Sportello sospeso
+            </strong>
+            Le nuove segnalazioni, i commenti e le chat sono bloccati. Quello che è già stato
+            scritto resta al suo posto e nessuno lo ha cancellato. Scrivici per capire come
+            riattivarlo.
+          </div>
+        </div>
+      )}
+
+      {!boxSuspended && !boxVerified && (
+        <div
+          className="flat-panel"
+          style={{
+            display: 'flex', alignItems: 'flex-start', gap: 12,
+            padding: '16px 18px', marginBottom: 20,
+            background: 'var(--b-orange)', color: 'var(--b-white)',
+          }}
+        >
+          <AlertTriangle size={20} strokeWidth={2.5} style={{ flexShrink: 0, marginTop: 2 }} />
+          <div style={{ fontSize: '0.86rem', lineHeight: 1.5, fontWeight: 600 }}>
+            <strong style={{ display: 'block', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 4 }}>
+              Sportello non verificato
+            </strong>
+            Lo sportello funziona normalmente, ma i tuoi compagni vedono un avviso finché non confermiamo
+            che sia stato aperto dai rappresentanti della scuola. Scrivici da un indirizzo istituzionale
+            per farlo verificare.
+          </div>
+        </div>
+      )}
 
       {/* Stat Cards */}
       {loading ? (

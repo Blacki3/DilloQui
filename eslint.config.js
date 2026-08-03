@@ -1,4 +1,5 @@
 import js from '@eslint/js';
+import globals from 'globals';
 import reactPlugin from 'eslint-plugin-react';
 import reactHooks from 'eslint-plugin-react-hooks';
 import reactRefresh from 'eslint-plugin-react-refresh';
@@ -14,16 +15,10 @@ export default [
       ecmaVersion: 2022,
       sourceType: 'module',
       parserOptions: { ecmaFeatures: { jsx: true } },
-      globals: {
-        window: 'readonly',
-        document: 'readonly',
-        localStorage: 'readonly',
-        navigator: 'readonly',
-        requestAnimationFrame: 'readonly',
-        setTimeout: 'readonly',
-        clearTimeout: 'readonly',
-        console: 'readonly',
-      },
+      // L'elenco a mano si dimenticava crypto, Blob, URL, atob,
+      // Notification: undefined che sembravano bug e non lo erano,
+      // e che a forza di comparire facevano ignorare l'output di lint.
+      globals: globals.browser,
     },
     plugins: {
       react: reactPlugin,

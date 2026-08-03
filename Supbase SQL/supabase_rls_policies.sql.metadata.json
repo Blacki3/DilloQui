@@ -1,5 +1,0 @@
-{
-  "summary": "Script SQL corretto per le RLS policies di Supabase. Include fix per commenti anonimi, sicurezza INSERT reports, funzione helper anti-ricorsione e nota sulla chat anonima.",
-  "updatedAt": "2026-07-20T22:29:47.732773Z",
-  "userFacing": true
-}

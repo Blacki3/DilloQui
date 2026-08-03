@@ -3,7 +3,8 @@ import { ThumbsUp, ThumbsDown, MessageSquare, ArrowRight, PlusCircle, Search, Fi
 import { useNavigate, useParams } from 'react-router-dom';
 import { useReports as useReportsMock, voteReport as voteReportMock, displayAuthor, getTypeLabel, getTypeBadgeClass, typesMatch, canonicalTypeKey, slugifyType, TYPE_LABEL } from '../../services/mockStore';
 import { motion, AnimatePresence } from 'framer-motion';
-import { getPublicReports, toggleVote } from '../../services/db';
+import { getPublicReports, toggleVote, FORUM_PAGE_SIZE } from '../../services/db';
+import { usePolling } from '../../hooks/usePolling';
 
 function CustomDropdown({ value, options, onChange, icon: Icon, activeCondition }) {
   const [isOpen, setIsOpen] = useState(false);
@@ -217,29 +218,70 @@ export default function Forum() {
   const mockPosts = useReportsMock().filter(r => r.isPublic);
   const [realPosts, setRealPosts] = useState([]);
   const [loadingPosts, setLoadingPosts] = useState(!isDemo);
+  // Partiamo dagli ultimi 50; «Carica altri» alza il tetto di altrettanti.
+  const [limite, setLimite] = useState(FORUM_PAGE_SIZE);
+  const [altriDisponibili, setAltriDisponibili] = useState(false);
+  const [caricandoAltri, setCaricandoAltri] = useState(false);
+
+  const mapPost = (r, votiLocali) => ({
+    ...r,
+    createdAt: new Date(r.created_at).getTime(),
+    time: new Date(r.created_at).toLocaleString('it-IT', {
+      day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit',
+    }),
+    isPublic: r.is_public,
+    anonimo: r.is_anonymous,
+    likes: r.votes?.[0]?.count || 0,
+    commentsCount: r.comments?.[0]?.count || 0,
+    authorName: r.authorName,               // dalla RPC (NULL se anonimo)
+    authorClass: r.authorClass || '—',
+    ...(votiLocali?.get(r.id) || {}),
+  });
+
+  const fetchPosts = () => {
+    if (isDemo) return Promise.resolve();
+    return getPublicReports(slug, { limit: limite })
+      .then(({ posts, altriDisponibili: altri }) => {
+        setAltriDisponibili(!!altri);
+        setRealPosts(prev => {
+          // Il voto appena dato non torna da questa query: senza tenerne
+          // memoria, il giro di aggiornamento successivo farebbe tornare
+          // grigio un pulsante che l'utente ha appena premuto.
+          const votiLocali = new Map(prev.map(p => [p.id, { voted: p.voted, userVote: p.userVote }]));
+          return posts.map(r => mapPost(r, votiLocali));
+        });
+      })
+      .catch(console.error);
+  };
 
   useEffect(() => {
     if (isDemo) return;
-    setLoadingPosts(true);
-    getPublicReports(slug)
-      .then(data => {
-        setRealPosts(data.map(r => ({
-          ...r,
-          createdAt: new Date(r.created_at).getTime(),
-          time: new Date(r.created_at).toLocaleString('it-IT', {
-            day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit',
-          }),
-          isPublic: r.is_public,
-          anonimo: r.is_anonymous,
-          likes: r.votes?.[0]?.count || 0,
-          commentsCount: r.comments?.[0]?.count || 0,
-          authorName: r.authorName,               // dalla RPC (NULL se anonimo)
-          authorClass: r.authorClass || '—',
-        })));
-      })
-      .catch(console.error)
-      .finally(() => setLoadingPosts(false));
+    // Cambio sportello: riparti dai 50 più recenti.
+    setLimite(FORUM_PAGE_SIZE);
+    setRealPosts([]);
+    setAltriDisponibili(false);
   }, [isDemo, slug]);
+
+  useEffect(() => {
+    if (isDemo) return;
+    // Il primo caricamento (e il cambio sportello) mostra lo skeleton;
+    // «Carica altri» usa il suo stato, senza far sparire la lista.
+    const ePrimoCaricamento = realPosts.length === 0;
+    if (ePrimoCaricamento) setLoadingPosts(true);
+    else setCaricandoAltri(true);
+    fetchPosts().finally(() => {
+      setLoadingPosts(false);
+      setCaricandoAltri(false);
+    });
+  }, [isDemo, slug, limite]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // I post degli altri compaiono senza dover uscire e rientrare
+  usePolling(fetchPosts, 45000);
+
+  const caricaAltri = () => {
+    if (caricandoAltri || !altriDisponibili) return;
+    setLimite(n => n + FORUM_PAGE_SIZE);
+  };
 
   const handleVote = async (e, reportId, value) => {
     e.stopPropagation();
@@ -491,6 +533,31 @@ export default function Forum() {
             </div>
           );
         })
+        )}
+
+        {!isDemo && !loadingPosts && altriDisponibili && (
+          <div style={{ display: 'flex', justifyContent: 'center', padding: '8px 0 4px' }}>
+            <button
+              type="button"
+              onClick={caricaAltri}
+              disabled={caricandoAltri}
+              style={{
+                border: '3px solid var(--b-black)',
+                background: caricandoAltri ? 'var(--b-gray)' : 'var(--b-yellow)',
+                color: 'var(--b-black)',
+                padding: '12px 22px',
+                fontWeight: 800,
+                textTransform: 'uppercase',
+                fontSize: '0.85rem',
+                letterSpacing: '0.04em',
+                cursor: caricandoAltri ? 'wait' : 'pointer',
+                boxShadow: 'var(--b-shadow-sm)',
+                opacity: caricandoAltri ? 0.7 : 1,
+              }}
+            >
+              {caricandoAltri ? 'Caricamento…' : 'Carica altri 50 post'}
+            </button>
+          </div>
         )}
       </div>
     </div>

@@ -128,7 +128,8 @@ export default function AdminProfile({ email = 'admin@scuola.edu.it' }) {
         reports = getReports();
       } else {
         if (!boxSlug) throw new Error('Nessuno sportello collegato.');
-        reports = await getAllReports(boxSlug);
+        // L'export deve contenere tutto, non solo la prima pagina
+        reports = await getAllReports(boxSlug, { limit: null });
       }
       const csv = reportsToCsv(reports);
       const stamp = new Date().toISOString().slice(0, 10);

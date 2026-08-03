@@ -28,7 +28,7 @@ export async function getBox(slug) {
   if (!slug) return null;
   const { data, error } = await supabase
     .from('boxes_public')
-    .select('slug, name, categories, require_class, email_filter_mode, regolamento')
+    .select('slug, name, categories, require_class, email_filter_mode, regolamento, verified, suspended')
     .eq('slug', slug)
     .maybeSingle();
   if (error) throw error;
@@ -46,6 +46,92 @@ export async function getBoxAdmin(slug) {
     .select('*')
     .eq('slug', slug)
     .maybeSingle();
+  if (error) throw error;
+  return data;
+}
+
+/**
+ * Gestione piattaforma (non del singolo sportello).
+ * Le RPC ricontrollano il permesso lato server: qui si decide solo cosa mostrare.
+ */
+export async function amIPlatformAdmin() {
+  const { data, error } = await supabase.rpc('am_i_platform_admin');
+  if (error) return false;
+  return data === true;
+}
+
+/** Lo sblocco vive nel database e scade da solo: qui si legge soltanto. */
+export async function platformSessionStatus() {
+  const { data, error } = await supabase.rpc('platform_session_status');
+  if (error) return { unlocked: false };
+  return data || { unlocked: false };
+}
+
+/**
+ * Seconda password del pannello. Non solleva sui tentativi sbagliati:
+ * risponde { ok:false, locked_until } dopo cinque errori.
+ */
+export async function platformUnlock(email, password) {
+  const { data, error } = await supabase.rpc('platform_unlock', {
+    p_email: email,
+    p_password: password,
+  });
+  // Un guasto del server non è una password sbagliata: confonderli
+  // manda a cercare per mezz'ora una credenziale che era giusta
+  if (error) return { ok: false, error: error.message };
+  return data || { ok: false };
+}
+
+export async function platformLock() {
+  await supabase.rpc('platform_lock');
+}
+
+/** Tutti gli sportelli con i dati del referente. I non verificati vengono per primi. */
+export async function listBoxesOverview() {
+  const { data, error } = await supabase.rpc('list_boxes_overview');
+  if (error) throw error;
+  return data || [];
+}
+
+/** Verifica o revoca uno sportello. La nota resta come traccia della decisione. */
+export async function setBoxVerified(slug, verified, note) {
+  const { data, error } = await supabase.rpc('set_box_verified', {
+    p_slug: slug,
+    p_verified: verified,
+    p_note: note || null,
+  });
+  if (error) throw error;
+  return data;
+}
+
+/** Scheda completa di uno sportello: configurazione, referenti, attività. */
+export async function getBoxDetail(slug) {
+  const { data, error } = await supabase.rpc('get_box_detail', { p_slug: slug });
+  if (error) throw error;
+  return data;
+}
+
+/** Sospende o riattiva. I dati restano, si fermano solo le scritture. */
+export async function setBoxSuspended(slug, suspended, note) {
+  const { data, error } = await supabase.rpc('set_box_suspended', {
+    p_slug: slug,
+    p_suspended: suspended,
+    p_note: note || null,
+  });
+  if (error) throw error;
+  return data;
+}
+
+/**
+ * Eliminazione di uno sportello altrui dal pannello di piattaforma:
+ * `conferma` deve ripetere lo slug. Non si annulla.
+ * Da non confondere con deleteBox, con cui un admin chiude il proprio.
+ */
+export async function platformDeleteBox(slug, conferma) {
+  const { data, error } = await supabase.rpc('delete_box', {
+    p_slug: slug,
+    p_conferma: conferma,
+  });
   if (error) throw error;
   return data;
 }
@@ -180,28 +266,50 @@ export async function getBoxUsers(boxSlug) {
  * Il risultato viene rimappato nella stessa forma dell'embed PostgREST
  * (votes/comments come array di { count }) per non toccare le pagine.
  */
-export async function getPublicReports(boxSlug) {
+export const FORUM_PAGE_SIZE = 50;
+
+export async function getPublicReports(boxSlug, { limit = FORUM_PAGE_SIZE } = {}) {
+  // Chiediamo una riga in più di quelle che servono: se torna indietro
+  // vuol dire che ce ne sono altre, ed è così che sappiamo se mostrare
+  // il pulsante «carica altri» senza una seconda query di conteggio.
   const { data, error } = await supabase
-    .rpc('get_public_reports_with_authors', { p_box_slug: boxSlug });
+    .rpc('get_public_reports_with_authors', { p_box_slug: boxSlug, p_limit: limit + 1 });
   if (error) throw error;
-  return (data || []).map(r => ({
-    ...r,
-    votes: [{ count: Number(r.votes_count) || 0 }],
-    comments: [{ count: Number(r.comments_count) || 0 }],
-    authorName: r.is_anonymous
-      ? null
-      : `${r.author_nome || ''} ${r.author_cognome || ''}`.trim() || null,
-    authorClass: r.is_anonymous ? null : (r.author_classe || null),
-  }));
+  const righe = data || [];
+  const altriDisponibili = righe.length > limit;
+  return {
+    posts: (altriDisponibili ? righe.slice(0, limit) : righe).map(r => ({
+      ...r,
+      votes: [{ count: Number(r.votes_count) || 0 }],
+      comments: [{ count: Number(r.comments_count) || 0 }],
+      authorName: r.is_anonymous
+        ? null
+        : `${r.author_nome || ''} ${r.author_cognome || ''}`.trim() || null,
+      authorClass: r.is_anonymous ? null : (r.author_classe || null),
+    })),
+    altriDisponibili,
+  };
 }
 
 /**
- * Legge tutte le segnalazioni di una box (Dashboard/Lista admin).
- * Usa la reports_admin_view che maschera author_id e anon_token per le anonime.
- * Arricchisce con profiles (nome/cognome/classe) per gli autori identificati.
+ * Tetto di default alle segnalazioni caricate in una volta. Una scuola
+ * grande accumula migliaia di righe e la lista ne mostra una schermata:
+ * scaricarle tutte a ogni giro di polling costa senza servire a niente.
  */
-export async function getAllReports(boxSlug) {
-  const { data, error } = await supabase
+export const REPORTS_PAGE_SIZE = 500;
+
+/**
+ * Legge le segnalazioni di una box (Dashboard/Lista admin), dalla più
+ * recente. Usa la reports_admin_view che maschera author_id e anon_token
+ * per le anonime, e arricchisce con nome/cognome/classe degli autori
+ * identificati.
+ *
+ * @param {object} [opts]
+ * @param {number|null} [opts.limit] massimo di righe, null per tutte (export CSV)
+ * @param {string|null} [opts.since] ISO date: scarta le segnalazioni precedenti
+ */
+export async function getAllReports(boxSlug, { limit = REPORTS_PAGE_SIZE, since = null } = {}) {
+  let query = supabase
     .from('reports_admin_view')
     .select(`
       *,
@@ -211,6 +319,11 @@ export async function getAllReports(boxSlug) {
     `)
     .eq('box_slug', boxSlug)
     .order('created_at', { ascending: false });
+
+  if (since) query = query.gte('created_at', since);
+  if (limit) query = query.limit(limit);
+
+  const { data, error } = await query;
   if (error) throw error;
   const rows = data || [];
 
@@ -229,6 +342,21 @@ export async function getAllReports(boxSlug) {
     ...r,
     profiles: r.author_id && !r.is_anonymous ? (byId[r.author_id] || null) : null,
   }));
+}
+
+/**
+ * Solo il numero di segnalazioni da leggere, per il badge della sidebar.
+ * È una COUNT eseguita dal database: prima si scaricava l'intera tabella,
+ * con voti, commenti e chat annidati, per poi contare in JavaScript.
+ */
+export async function countNewReports(boxSlug) {
+  const { count, error } = await supabase
+    .from('reports_admin_view')
+    .select('id', { count: 'exact', head: true })
+    .eq('box_slug', boxSlug)
+    .eq('status', 'new');
+  if (error) throw error;
+  return count || 0;
 }
 
 /**
@@ -673,26 +801,16 @@ function formatRelativeTime(isoString) {
 // ── FUNZIONI DISTRUTTIVE (GDPR) ──
 
 /**
- * Anonimizzazione irreversibile dell'account studente (Diritto all'Oblio).
- * Rimuove le PII (Personally Identificable Information) e la box associata.
- * Le segnalazioni create rimarranno ma risulteranno di un "Utente Cancellato".
+ * Cancellazione irreversibile dell'account (Diritto all'Oblio).
+ * L'account sparisce davvero; le segnalazioni restano sul forum senza
+ * più autore, con un token nuovo che non è collegato a nessuno.
+ * La scrittura diretta su profiles non poteva funzionare: il ruolo non
+ * è modificabile dal client e 'deleted' non è un valore ammesso.
  */
 export async function deleteMyProfile() {
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) throw new Error('Non autenticato');
-
-  const { error } = await supabase
-    .from('profiles')
-    .update({
-      nome: 'Account',
-      cognome: 'Eliminato',
-      classe: null,
-      box_slug: null,
-      role: 'deleted'
-    })
-    .eq('id', user.id);
-  
+  const { data, error } = await supabase.rpc('delete_my_account');
   if (error) throw error;
+  return data;
 }
 
 /**

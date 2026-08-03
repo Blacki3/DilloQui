@@ -30,7 +30,7 @@ import {
   needsAttentionReal,
   useAdminReadVersionReal,
 } from '../../services/adminReadStore';
-import { getAllReports, updateReport, sendChatMessage, getChatMessages } from '../../services/db';
+import { getAllReports, updateReport, sendChatMessage, getChatMessages, REPORTS_PAGE_SIZE } from '../../services/db';
 import ConfirmModal from '../../components/ConfirmModal';
 import { supabase } from '../../lib/supabaseClient';
 import { usePolling } from '../../hooks/usePolling';
@@ -497,10 +497,12 @@ export default function ReportsList() {
   const mockReports = useReportsMock();
   const [realReports, setRealReports] = useState([]);
   const [loadingReports, setLoadingReports] = useState(!isDemo);
+  // Si parte dalle più recenti; lo storico completo si carica su richiesta
+  const [limite, setLimite] = useState(REPORTS_PAGE_SIZE);
 
   const fetchReports = () => {
     if (isDemo || !boxSlug) return Promise.resolve();
-    return getAllReports(boxSlug)
+    return getAllReports(boxSlug, { limit: limite })
       .then((data) => {
         setRealReports((prev) => {
           // Uniamo la chat già caricata se presente
@@ -532,7 +534,7 @@ export default function ReportsList() {
   useEffect(() => {
     setLoadingReports(true);
     fetchReports().finally(() => setLoadingReports(false));
-  }, [isDemo, boxSlug]);
+  }, [isDemo, boxSlug, limite]);
 
   usePolling(fetchReports, 15000);
 
@@ -943,6 +945,19 @@ export default function ReportsList() {
       <div className="reports-list-count">
         {filtered.length} segnalazioni trovate
       </div>
+
+      {!isDemo && limite && realReports.length >= limite && (
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', border: '2px solid var(--b-black)', background: 'var(--b-yellow)', padding: '10px 14px', marginBottom: 12, fontSize: '0.82rem', fontWeight: 700 }}>
+          <span>Stai vedendo le {limite} segnalazioni più recenti. I filtri e la ricerca lavorano su queste.</span>
+          <button
+            type="button"
+            onClick={() => setLimite(null)}
+            style={{ border: '2px solid var(--b-black)', background: 'var(--b-white)', padding: '6px 12px', fontWeight: 800, textTransform: 'uppercase', fontSize: '0.72rem', cursor: 'pointer', whiteSpace: 'nowrap' }}
+          >
+            Carica tutto lo storico
+          </button>
+        </div>
+      )}
 
       <div className="reports-list-scroll scrollbar-hidden">
       {filtered.length === 0 && (

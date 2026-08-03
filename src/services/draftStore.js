@@ -77,7 +77,11 @@ function getDrafts(slug) {
 function setDrafts(slug, drafts) {
   try {
     localStorage.setItem(draftsKey(slug), JSON.stringify(drafts));
-  } catch {}
+  } catch (err) {
+    // Succede in navigazione privata o a quota piena. La bozza resta in
+    // memoria per la sessione: bloccare la scrittura sarebbe peggio.
+    console.warn('Bozza non salvata su questo dispositivo:', err);
+  }
 }
 
 export function getAllDrafts(slug = 'demo') {

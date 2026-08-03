@@ -28,6 +28,9 @@ export const ReportsList = lazyWithPreload(() => import('./pages/admin/ReportsLi
 export const Settings = lazyWithPreload(() => import('./pages/admin/Settings'));
 export const AdminProfile = lazyWithPreload(() => import('./pages/admin/AdminProfile'));
 export const UsersList = lazyWithPreload(() => import('./pages/admin/UsersList'));
+// Volutamente senza preload: il gate si scarica solo entrando nell'URL,
+// e il pannello vero è importato da lì soltanto a sblocco avvenuto
+const PlatformGate = lazy(() => import('./pages/admin/PlatformGate'));
 
 export const StudentLayout = lazyWithPreload(() => import('./layouts/StudentLayout'));
 export const Forum = lazyWithPreload(() => import('./pages/student/Forum'));
@@ -116,6 +119,12 @@ function StudentProtectedRoute({ children }) {
 
 
 function App() {
+  const { isPlatformAdmin, loading: authLoading } = useAuth();
+  // Finché la sessione non è risolta lo stato è ignoto: senza questa
+  // attesa un deep link a /admin/piattaforma rimbalzerebbe alla home
+  // prima che il server abbia risposto.
+  const platformUnknown = authLoading || isPlatformAdmin === null;
+
   return (
     <>
       <ScrollToTop />
@@ -163,6 +172,11 @@ function App() {
             <Route path="settings" element={<Settings />} />
             <Route path="users" element={<UsersList />} />
             <Route path="profile" element={<AdminProfile />} />
+            {/* Gestione piattaforma: la rotta esiste solo per chi il server
+                ha riconosciuto come gestore. Per tutti gli altri l'URL cade
+                nel fallback e nessun chunk viene mai richiesto. */}
+            {platformUnknown && <Route path="piattaforma" element={<BrutalistLoader />} />}
+            {isPlatformAdmin === true && <Route path="piattaforma" element={<PlatformGate />} />}
           </Route>
 
           {/* Route Admin (DEMO) — allowMock: solo qui il token mock è valido */}

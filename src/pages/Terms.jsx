@@ -50,7 +50,16 @@ export default function Terms() {
               </p>
 
               <h2 style={{ fontSize: '1.5rem', fontWeight: 800, marginTop: 40, marginBottom: 16, textTransform: 'uppercase' }}>
-                2. Regole di Condotta per chi Segnala (Studenti)
+                2. Chi Può Iscriversi
+              </h2>
+              <p>
+                Per usare DILLOQUI devi avere <strong>almeno 14 anni compiuti</strong> ed essere uno studente della scuola a cui appartiene lo sportello. Sotto i 14 anni la legge italiana richiede il consenso di chi esercita la responsabilità genitoriale, che DilloQui non è in grado di raccogliere: per questo il servizio non è aperto a chi ha un'età inferiore.
+                <br /><br />
+                Confermi di avere l'età richiesta quando completi l'iscrizione. Gli account che risultano appartenere a minori di 14 anni vengono chiusi e i loro dati eliminati.
+              </p>
+
+              <h2 style={{ fontSize: '1.5rem', fontWeight: 800, marginTop: 40, marginBottom: 16, textTransform: 'uppercase' }}>
+                3. Regole di Condotta per chi Segnala (Studenti)
               </h2>
               <p>
                 Utilizzando DILLOQUI ti impegni a <strong>NON</strong> usare la piattaforma per:
@@ -66,7 +75,7 @@ export default function Terms() {
               </p>
 
               <h2 style={{ fontSize: '1.5rem', fontWeight: 800, marginTop: 40, marginBottom: 16, textTransform: 'uppercase' }}>
-                3. Doveri dei Rappresentanti (Admin della Box)
+                4. Doveri dei Rappresentanti (Admin della Box)
               </h2>
               <p>
                 Se crei una Box e diventi Amministratore (Rappresentante), ti assumi la responsabilità di gestire i dati dei tuoi compagni in modo etico. Ti impegni espressamente a:
@@ -81,7 +90,7 @@ export default function Terms() {
               </p>
 
               <h2 style={{ fontSize: '1.5rem', fontWeight: 800, marginTop: 40, marginBottom: 16, textTransform: 'uppercase' }}>
-                4. Limitazione di Responsabilità del Creatore della Piattaforma
+                5. Limitazione di Responsabilità del Creatore della Piattaforma
               </h2>
               <p>
                 DILLOQUI è un fornitore tecnico del servizio (Software as a Service) fornito "così com'è". <strong>Il creatore e gli sviluppatori della piattaforma non hanno alcun accesso non autorizzato né controllo</strong> sui contenuti inseriti all'interno delle singole Box. 

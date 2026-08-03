@@ -153,7 +153,14 @@ export default function AdminLogin() {
                 </div>
                 <label style={{ textAlign: 'left', display: 'block' }}>Nome Sportello / Scuola</label>
                 <input type="text" placeholder="Es. Liceo Leonardo da Vinci" value={nomeSportello} onChange={e => setNomeSportello(e.target.value)} required id="admin-reg-sportello" />
-                
+
+                {!isDemo && (
+                  <p style={{ textAlign: 'left', fontSize: '0.78rem', color: 'var(--b-gray)', margin: '4px 0 0', lineHeight: 1.5 }}>
+                    Registrandoti con un indirizzo <strong>@nomescuola.edu.it</strong> lo sportello risulta subito verificato.
+                    Con un altro dominio resta attivo lo stesso, ma gli studenti vedranno un avviso finché non lo verifichiamo.
+                  </p>
+                )}
+
                 <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, marginTop: 16, marginBottom: 8, textAlign: 'left' }}>
                   <input 
                     type="checkbox" 

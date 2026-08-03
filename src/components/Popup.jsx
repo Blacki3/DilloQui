@@ -1,11 +1,21 @@
 import { X } from 'lucide-react';
+import { useDialog } from '../hooks/useDialog';
 
 export default function Popup({ show, title, message, onClose, children }) {
+  const dialogRef = useDialog(show, onClose);
+
   if (!show) return null;
 
   return (
     <div className="popup-overlay" onClick={(e) => { if (e.target === e.currentTarget) onClose?.(); }}>
-      <div className="popup-box">
+      <div
+        className="popup-box"
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-label={title}
+        tabIndex={-1}
+      >
         {onClose && (
           <button className="popup-close-btn" onClick={onClose} aria-label="Chiudi popup">
             <X size={18} strokeWidth={3} />
