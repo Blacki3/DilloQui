@@ -136,10 +136,13 @@ export async function updateNotifCategory(currentPrefs, patch) {
 /**
  * Invoca l'Edge Function che manda le push (best-effort, non blocca l'UI).
  */
-export async function notifyEvent({ type, boxSlug, reportId, title, body, excludeUserId }) {
+export async function notifyEvent({ type, boxSlug, reportId, eventId }) {
   try {
     await supabase.functions.invoke('send-push', {
-      body: { type, boxSlug, reportId, title, body, excludeUserId },
+      // Il server ricava testo, URL, destinatari e box dal database. I campi
+      // legacy title/body/excludeUserId restano nell'API JS per non rompere i
+      // chiamanti, ma non vengono mai inviati al server.
+      body: { type, boxSlug, reportId, eventId },
     });
   } catch (err) {
     console.warn('Push non inviata:', err);

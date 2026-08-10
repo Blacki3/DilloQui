@@ -40,6 +40,7 @@ Poi leggi nell'Edge Function con `Deno.env.get('RESEND_API_KEY')`.
 13. `supabase_p4_gestione_sportelli.sql` — sospensione ed eliminazione degli sportelli, scheda di dettaglio nel pannello
 14. `supabase_p5_privacy.sql` — eliminazione dell'account funzionante e cancellazione dei dati vecchi
 15. `supabase_p6_forum_paginazione.sql` — tetto di 50 post al forum (con «carica altri»)
+16. `supabase_security_p7.sql` — whitelist legata ad Auth, validazione input e dedup delle push
 
 **Non rieseguire `supabase_fixes.sql` o `supabase_rls_policies.sql` su un database già patchato:** ripristinerebbero versioni permissive di policy e RPC che P1/P3 hanno ristretto. Le patch P0–P6 sono invece idempotenti. P4 va sempre **dopo** P3, perché riscrive le stesse policy aggiungendoci il controllo sulla sospensione: eseguire P3 dopo P4 lo toglierebbe.
 

@@ -15,6 +15,7 @@ import {
 import { Forum, PostDetail, NewReport, MyReports, StudentProfile, Drafts, Tendenze, Regolamento } from '../App';
 import { supabase } from '../lib/supabaseClient';
 import { usePolling } from '../hooks/usePolling';
+import RegolamentoModal from '../components/RegolamentoModal';
 
 export default function StudentLayout() {
   const { slug } = useParams();
@@ -48,12 +49,25 @@ export default function StudentLayout() {
   // non solo al momento dell'iscrizione.
   const [boxVerified, setBoxVerified] = useState(true);
   const [boxSuspended, setBoxSuspended] = useState(false);
+  const [boxName, setBoxName] = useState('');
+  const [regolamentoText, setRegolamentoText] = useState('');
+  const [showRegolamentoModal, setShowRegolamentoModal] = useState(false);
   useEffect(() => {
     if (isDemo) return;
     getBox(slug)
       .then(box => {
         setBoxVerified(box?.verified !== false);
         setBoxSuspended(box?.suspended === true);
+        setBoxName(box?.name || '');
+        // Mostra il regolamento la prima volta che lo studente accede
+        const reg = box?.regolamento?.trim();
+        if (reg) {
+          setRegolamentoText(reg);
+          const acceptedKey = `dq_regolamento_accepted_${slug}`;
+          if (!localStorage.getItem(acceptedKey)) {
+            setShowRegolamentoModal(true);
+          }
+        }
       })
       .catch(() => {});
   }, [slug, isDemo]);
@@ -145,6 +159,17 @@ export default function StudentLayout() {
 
   return (
     <div className="student-wrapper">
+      {/* Modale Regolamento — prima accettazione */}
+      {showRegolamentoModal && (
+        <RegolamentoModal
+          regolamento={regolamentoText}
+          boxName={boxName}
+          onAccept={() => {
+            localStorage.setItem(`dq_regolamento_accepted_${slug}`, '1');
+            setShowRegolamentoModal(false);
+          }}
+        />
+      )}
       {/* Backdrop invisibile per chiudere il menù al tap fuori */}
       {showNewMenu && (
         <div

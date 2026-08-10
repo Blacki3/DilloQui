@@ -1,22 +1,7 @@
 import { supabase } from '../lib/supabaseClient';
 
-const ANON_TOKENS_KEY = 'dq_anon_tokens';
-
 // Colonne reports senza anon_token (REVOKE SELECT sulla colonna lato DB)
 const REPORT_SAFE_COLS = 'id, box_slug, author_id, type, title, content, is_public, is_anonymous, status, created_at';
-
-function getAnonTokens() {
-  try { return JSON.parse(localStorage.getItem(ANON_TOKENS_KEY) || '[]'); }
-  catch { return []; }
-}
-
-function saveAnonToken(token) {
-  const tokens = getAnonTokens();
-  if (!tokens.includes(token)) {
-    tokens.push(token);
-    localStorage.setItem(ANON_TOKENS_KEY, JSON.stringify(tokens));
-  }
-}
 
 // BOXES
 
@@ -361,7 +346,6 @@ export async function countNewReports(boxSlug) {
 
 /**
  * Legge una singola segnalazione per ID.
- * anon_token non viene mai selezionato (colonna revocata lato DB).
  */
 export async function getReport(reportId) {
   const { data, error } = await supabase
@@ -390,15 +374,12 @@ export async function getMyReports() {
 }
 
 /**
- * Recupera le segnalazioni anonime dell'utente tramite i token salvati in localStorage.
- * Usa la funzione RPC `get_anon_reports` che bypassa le RLS policy.
+ * Recupera le segnalazioni anonime dell'utente tramite la tabella report_owners (server-side).
+ * Non dipende più dal localStorage: funziona su tutti i dispositivi.
  */
 export async function getMyAnonReports() {
-  const tokens = getAnonTokens();
-  if (tokens.length === 0) return [];
-
   const { data, error } = await supabase
-    .rpc('get_anon_reports', { tokens });
+    .rpc('get_my_anon_reports');
   if (error) throw error;
   return data || [];
 }
@@ -417,21 +398,15 @@ export async function createReport({ boxSlug, type, title, content, isPublic, is
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error('Non autenticato');
 
-  let anonToken = null;
-  let authorId = null;
-
-  if (isAnonymous) {
-    anonToken = crypto.randomUUID();
-  } else {
-    authorId = user.id;
-  }
+  // Per le segnalazioni anonime, author_id è NULL nel record pubblico.
+  // L'ownership è tracciata nella tabella report_owners (server-side).
+  const authorId = isAnonymous ? null : user.id;
 
   const { data, error } = await supabase
     .from('reports')
     .insert({
       box_slug: boxSlug,
       author_id: authorId,
-      anon_token: anonToken,
       type,
       title,
       content,
@@ -443,10 +418,6 @@ export async function createReport({ boxSlug, type, title, content, isPublic, is
     .single();
 
   if (error) throw error;
-
-  // Salva il token anonimo in localStorage per permettere il recupero futuro
-  // (non restituito dal SELECT: colonna revocata)
-  if (anonToken) saveAnonToken(anonToken);
 
   // Ownership privata (anche per anonime) → serve alle push senza esporre l'autore all'admin.
   // Preferibile il trigger SECURITY DEFINER AFTER INSERT (supabase_security_p2.sql);
@@ -467,6 +438,7 @@ export async function createReport({ boxSlug, type, title, content, isPublic, is
     type: 'new_report',
     boxSlug,
     reportId: data.id,
+    eventId: data.id,
     title: 'Nuova segnalazione',
     body: 'È stata inviata una nuova segnalazione.',
     excludeUserId: user.id,
@@ -549,7 +521,6 @@ export async function addComment({ reportId, content, isAnonymous }) {
     content,
     is_anonymous: isAnonymous,
     author_id: isAnonymous ? null : user.id,
-    anon_token: isAnonymous ? crypto.randomUUID() : null,
   };
 
   const { data, error } = await supabase
@@ -566,6 +537,7 @@ export async function addComment({ reportId, content, isAnonymous }) {
     type: 'forum_comment',
     boxSlug: report?.box_slug,
     reportId,
+    eventId: data.id,
     title: 'Nuovo commento',
     body: 'È stato aggiunto un nuovo commento al forum.',
     excludeUserId: user.id,
@@ -613,6 +585,7 @@ export async function sendChatMessage({ reportId, content }) {
     type: 'chat_message',
     boxSlug: report?.box_slug,
     reportId,
+    eventId: data.id,
     title: 'Nuovo messaggio',
     body: 'Hai ricevuto un nuovo messaggio in chat.',
     excludeUserId: user.id,
@@ -621,30 +594,30 @@ export async function sendChatMessage({ reportId, content }) {
   return data;
 }
 
-// CHAT PER SEGNALAZIONI ANONIME (via token localStorage)
+// CHAT PER SEGNALAZIONI ANONIME (autenticata via JWT / report_owners)
 
 /**
- * Legge la chat di una segnalazione anonima usando il token segreto.
+ * Legge la chat di una segnalazione anonima.
+ * L'accesso è verificato tramite report_owners (ownership server-side).
  */
-export async function getAnonChatMessages(reportId, anonToken) {
+export async function getAnonChatMessages(reportId) {
   const { data, error } = await supabase
-    .rpc('get_anon_chat', { p_report_id: reportId, p_token: anonToken });
+    .rpc('get_anon_chat', { p_report_id: reportId });
   if (error) throw error;
   return data || [];
 }
 
 /**
  * Invia un messaggio nella chat di una segnalazione anonima.
+ * L'accesso è verificato tramite report_owners (ownership server-side).
  */
-export async function sendAnonChatMessage({ reportId, anonToken, content }) {
+export async function sendAnonChatMessage({ reportId, content }) {
   const { data, error } = await supabase
     .rpc('send_anon_chat_message', {
       p_report_id: reportId,
-      p_token: anonToken,
       p_content: content,
     });
   if (error) throw error;
-  // Le RPC che ritornano una riga singola possono restituire un array
   const saved = Array.isArray(data) ? data[0] : data;
 
   const { data: { user } } = await supabase.auth.getUser();
@@ -654,6 +627,7 @@ export async function sendAnonChatMessage({ reportId, anonToken, content }) {
     type: 'chat_message',
     boxSlug: report?.box_slug,
     reportId,
+    eventId: saved?.id,
     title: 'Nuovo messaggio',
     body: 'Hai ricevuto un nuovo messaggio in chat.',
     excludeUserId: user?.id,
@@ -663,13 +637,13 @@ export async function sendAnonChatMessage({ reportId, anonToken, content }) {
 }
 
 /**
- * Aggiorna lo stato di una segnalazione anonima (risolta/chiusa) via token.
+ * Aggiorna lo stato di una segnalazione anonima (risolta/chiusa).
+ * L'accesso è verificato tramite report_owners (ownership server-side).
  */
-export async function updateAnonReportStatus(reportId, anonToken, status) {
+export async function updateAnonReportStatus(reportId, status) {
   const { data, error } = await supabase
     .rpc('update_anon_report_status', {
       p_report_id: reportId,
-      p_token: anonToken,
       p_status: status,
     });
   if (error) throw error;

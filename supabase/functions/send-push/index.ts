@@ -1,12 +1,3 @@
-// Supabase Edge Function: send-push
-// Deploy: supabase functions deploy send-push
-// Secrets:
-//   supabase secrets set VAPID_PUBLIC_KEY=... VAPID_PRIVATE_KEY=... VAPID_SUBJECT=mailto:admin@dilloqui.netlify.app
-//
-// Auth (P1): richiede JWT valido. Il caller deve essere admin del box
-// oppure owner/autore della segnalazione (o membro del box per new_report /
-// forum_comment). Fail closed → 401/403.
-
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.1';
 import webpush from 'npm:web-push@3.6.7';
 
@@ -15,241 +6,190 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+const EVENT_COPY = {
+  new_report: { title: 'Nuova segnalazione', body: 'È stata inviata una nuova segnalazione.' },
+  chat_message: { title: 'Nuovo messaggio', body: 'Hai ricevuto un nuovo messaggio in chat.' },
+  status_change: { title: 'Aggiornamento segnalazione', body: 'Lo stato della segnalazione è stato aggiornato.' },
+  forum_comment: { title: 'Nuovo commento', body: 'È stato aggiunto un nuovo commento al forum.' },
+};
+
 Deno.serve(async (req) => {
-  if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders });
-  }
+  if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
 
   try {
     const vapidPublic = Deno.env.get('VAPID_PUBLIC_KEY');
     const vapidPrivate = Deno.env.get('VAPID_PRIVATE_KEY');
     const vapidSubject = Deno.env.get('VAPID_SUBJECT') || 'mailto:admin@dilloqui.netlify.app';
-    if (!vapidPublic || !vapidPrivate) {
-      return json({ error: 'VAPID keys missing' }, 500);
-    }
-
+    if (!vapidPublic || !vapidPrivate) return json({ error: 'VAPID keys missing' }, 500);
     webpush.setVapidDetails(vapidSubject, vapidPublic, vapidPrivate);
 
-    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-    const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-    const supabase = createClient(supabaseUrl, serviceKey);
+    const supabase = createClient(
+      Deno.env.get('SUPABASE_URL')!,
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
+    );
 
-    // ── Auth fail-closed: JWT obbligatorio ───────────────────────────────
-    const authHeader = req.headers.get('Authorization') || '';
-    const jwt = authHeader.replace(/^Bearer\s+/i, '').trim();
-    if (!jwt) {
-      return json({ error: 'Unauthorized' }, 401);
-    }
-
+    const jwt = (req.headers.get('Authorization') || '').replace(/^Bearer\s+/i, '').trim();
+    if (!jwt) return json({ error: 'Unauthorized' }, 401);
     const { data: authData, error: authError } = await supabase.auth.getUser(jwt);
-    if (authError || !authData?.user) {
-      return json({ error: 'Unauthorized' }, 401);
-    }
+    if (authError || !authData?.user) return json({ error: 'Unauthorized' }, 401);
     const callerId = authData.user.id;
 
-    const payload = await req.json();
-    const { type, boxSlug, reportId, title, body, excludeUserId } = payload;
+    const { type, boxSlug, reportId, eventId } = await req.json();
+    if (!EVENT_COPY[type] || !reportId) return json({ error: 'Invalid event' }, 400);
 
-    const allowedTypes = ['new_report', 'chat_message', 'status_change', 'forum_comment'];
-    if (!type || !allowedTypes.includes(type)) {
-      return json({ error: 'Invalid type' }, 400);
-    }
+    const { data: report } = await supabase
+      .from('reports')
+      .select('id, author_id, box_slug, is_public, created_at')
+      .eq('id', reportId)
+      .maybeSingle();
+    // boxSlug è compatibilità client; non può cambiare la box effettiva.
+    if (!report || (boxSlug && boxSlug !== report.box_slug)) return json({ error: 'Forbidden' }, 403);
 
-    const authorized = await authorizeCaller(supabase, {
-      callerId,
-      type,
-      boxSlug,
-      reportId,
-    });
-    if (!authorized) {
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('id, role, box_slug')
+      .eq('id', callerId)
+      .maybeSingle();
+    if (!profile || !await authorizeCaller(supabase, { callerId, type, eventId, profile, report })) {
       return json({ error: 'Forbidden' }, 403);
     }
 
-    const targetIds = await resolveTargets(supabase, { type, boxSlug, reportId, excludeUserId });
-    if (targetIds.length === 0) {
-      return json({ sent: 0, reason: 'no targets' });
+    // Ogni report/commento/messaggio può generare una sola notifica. Lo stato
+    // è escluso perché non esiste una riga-evento distinta da deduplicare.
+    if (['new_report', 'chat_message', 'forum_comment'].includes(type)) {
+      const { error: eventError } = await supabase.from('notification_event_log').insert({
+        actor_id: callerId,
+        event_type: type,
+        event_id: eventId,
+      });
+      if (eventError?.code === '23505') return json({ sent: 0, reason: 'duplicate event' });
+      if (eventError) throw eventError;
     }
 
-    // Filtra per preferenze
+    const targetIds = await resolveTargets(supabase, { type, report, excludeUserId: callerId });
+    if (targetIds.length === 0) return json({ sent: 0, reason: 'no targets' });
+
     const { data: profiles } = await supabase
       .from('profiles')
-      .select('id, role, box_slug, notif_prefs')
+      .select('id, role, notif_prefs')
       .in('id', targetIds);
-
-    const allowed = (profiles || []).filter((p) => {
-      const prefs = p.notif_prefs || {};
-      if (!prefs.push_enabled) return false;
-      if (type === 'new_report') return prefs.new_report !== false && p.role === 'admin';
-      if (type === 'chat_message') return prefs.chat_message !== false;
-      if (type === 'status_change') return prefs.status_change !== false;
-      if (type === 'forum_comment') return prefs.forum_comment !== false;
-      return false;
-    });
-
-    if (allowed.length === 0) {
-      return json({ sent: 0, reason: 'prefs off' });
-    }
+    const allowed = (profiles || []).filter((p) => notificationEnabled(p, type));
+    if (allowed.length === 0) return json({ sent: 0, reason: 'prefs off' });
 
     const allowedIds = allowed.map((p) => p.id);
     const { data: subs } = await supabase
       .from('push_subscriptions')
-      .select('*')
+      .select('endpoint, p256dh, auth, user_id')
       .in('user_id', allowedIds);
 
-    const url = buildUrl(type, boxSlug, reportId, allowed[0]?.role);
     let sent = 0;
-    const staleEndpoints = [];
-
+    const staleEndpoints: string[] = [];
     for (const sub of subs || []) {
+      const target = allowed.find((p) => p.id === sub.user_id);
+      if (!target) continue;
       try {
         await webpush.sendNotification(
-          {
-            endpoint: sub.endpoint,
-            keys: { p256dh: sub.p256dh, auth: sub.auth },
-          },
+          { endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } },
           JSON.stringify({
-            title: title || 'DILLOQUI',
-            body: body || '',
-            url,
-            tag: `${type}-${reportId || 'x'}`,
+            ...EVENT_COPY[type],
+            url: buildUrl(type, report.box_slug, report.id, target.role),
+            tag: `${type}-${eventId || report.id}`,
           }),
         );
         sent += 1;
       } catch (err) {
-        // 404/410 = subscription scaduta
-        if (err?.statusCode === 404 || err?.statusCode === 410) {
-          staleEndpoints.push(sub.endpoint);
-        }
+        if (err?.statusCode === 404 || err?.statusCode === 410) staleEndpoints.push(sub.endpoint);
       }
     }
+    if (staleEndpoints.length) await supabase.from('push_subscriptions').delete().in('endpoint', staleEndpoints);
 
-    if (staleEndpoints.length) {
-      await supabase.from('push_subscriptions').delete().in('endpoint', staleEndpoints);
-    }
-
-    // ── Salva notifiche in-app per ogni destinatario ─────────────────────
-    // Usiamo service_role → bypassa RLS INSERT (solo il server può scrivere)
-    if (allowedIds.length > 0) {
-      const notifRows = allowedIds.map((uid) => ({
-        user_id: uid,
-        type,
-        title: title || 'DILLOQUI',
-        body: body || '',
-        url,
-        report_id: reportId || null,
-        read: false,
-      }));
-      await supabase.from('notifications').insert(notifRows);
-    }
-
+    const notificationRows = allowed.map((target) => ({
+      user_id: target.id,
+      type,
+      ...EVENT_COPY[type],
+      url: buildUrl(type, report.box_slug, report.id, target.role),
+      report_id: report.id,
+      read: false,
+    }));
+    await supabase.from('notifications').insert(notificationRows);
     return json({ sent });
   } catch (err) {
     console.error(err);
-    return json({ error: String(err?.message || err) }, 500);
+    return json({ error: 'Internal error' }, 500);
   }
 });
 
-/**
- * Fail closed: solo admin del box, owner/autore della segnalazione,
- * o membro del box per new_report / forum_comment.
- */
-async function authorizeCaller(supabase, { callerId, type, boxSlug, reportId }) {
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('id, role, box_slug')
-    .eq('id', callerId)
+function notificationEnabled(profile, type) {
+  const prefs = profile.notif_prefs || {};
+  if (!prefs.push_enabled) return false;
+  if (type === 'new_report') return prefs.new_report !== false && profile.role === 'admin';
+  if (type === 'chat_message') return prefs.chat_message !== false;
+  if (type === 'status_change') return prefs.status_change !== false;
+  return prefs.forum_comment !== false;
+}
+
+async function authorizeCaller(supabase, { callerId, type, eventId, profile, report }) {
+  const isAdmin = profile.role === 'admin' && profile.box_slug === report.box_slug;
+  const { data: owner } = await supabase
+    .from('report_owners')
+    .select('user_id')
+    .eq('report_id', report.id)
+    .eq('user_id', callerId)
     .maybeSingle();
+  const isOwner = !!owner || report.author_id === callerId;
 
-  if (!profile) return false;
+  if (type === 'new_report') return isOwner && eventId === report.id;
+  if (type === 'status_change') return isAdmin || isOwner;
 
-  let report = null;
-  if (reportId) {
-    const { data } = await supabase
-      .from('reports')
-      .select('author_id, box_slug')
-      .eq('id', reportId)
+  if (type === 'forum_comment') {
+    if (!eventId || profile.box_slug !== report.box_slug || !report.is_public) return false;
+    const { data: comment } = await supabase
+      .from('comments')
+      .select('id, report_id, author_id')
+      .eq('id', eventId)
       .maybeSingle();
-    report = data;
+    return !!comment && comment.report_id === report.id && (comment.author_id === callerId || comment.author_id === null);
   }
 
-  const effectiveSlug = boxSlug || report?.box_slug || null;
-
-  // Admin del box
-  if (profile.role === 'admin' && effectiveSlug && profile.box_slug === effectiveSlug) {
-    return true;
-  }
-
-  // Owner privato (anche segnalazioni anonime)
-  if (reportId) {
-    const { data: owner } = await supabase
-      .from('report_owners')
-      .select('user_id')
-      .eq('report_id', reportId)
-      .eq('user_id', callerId)
+  if (type === 'chat_message') {
+    if (!eventId || !(isAdmin || isOwner)) return false;
+    const { data: message } = await supabase
+      .from('chat_messages')
+      .select('id, report_id, author_id')
+      .eq('id', eventId)
       .maybeSingle();
-    if (owner) return true;
-
-    if (report?.author_id === callerId) return true;
+    return !!message && message.report_id === report.id && (message.author_id === callerId || message.author_id === null);
   }
 
-  // Studente membro del box: può notificare new_report / forum_comment
-  if (
-    (type === 'new_report' || type === 'forum_comment')
-    && effectiveSlug
-    && profile.box_slug === effectiveSlug
-  ) {
-    return true;
-  }
-
-  // Studente che cambia stato o scrive in chat sulla propria segnalazione
-  // (già coperto da owner/author sopra). Niente altro.
   return false;
 }
 
-async function resolveTargets(supabase, { type, boxSlug, reportId, excludeUserId }) {
-  const ids = new Set();
-
-  if (type === 'new_report' && boxSlug) {
-    const { data } = await supabase.rpc('get_box_admin_ids', { p_box_slug: boxSlug });
+async function resolveTargets(supabase, { type, report, excludeUserId }) {
+  const ids = new Set<string>();
+  if (type === 'new_report') {
+    const { data } = await supabase.rpc('get_box_admin_ids', { p_box_slug: report.box_slug });
     (data || []).forEach((id) => ids.add(id));
-  }
-
-  if ((type === 'chat_message' || type === 'status_change' || type === 'forum_comment') && reportId) {
-    // Owner (identificato o anonimo via report_owners)
-    const { data: report } = await supabase
-      .from('reports')
-      .select('author_id, box_slug')
-      .eq('id', reportId)
-      .maybeSingle();
-
-    if (report?.author_id) ids.add(report.author_id);
-
+  } else {
+    if (report.author_id) ids.add(report.author_id);
     const { data: owner } = await supabase
       .from('report_owners')
       .select('user_id')
-      .eq('report_id', reportId)
+      .eq('report_id', report.id)
       .maybeSingle();
     if (owner?.user_id) ids.add(owner.user_id);
-
-    // Per la chat: avvisa anche gli admin della box
     if (type === 'chat_message') {
-      const slug = boxSlug || report?.box_slug;
-      if (slug) {
-        const { data } = await supabase.rpc('get_box_admin_ids', { p_box_slug: slug });
-        (data || []).forEach((id) => ids.add(id));
-      }
+      const { data } = await supabase.rpc('get_box_admin_ids', { p_box_slug: report.box_slug });
+      (data || []).forEach((id) => ids.add(id));
     }
   }
-
-  if (excludeUserId) ids.delete(excludeUserId);
+  ids.delete(excludeUserId);
   return [...ids];
 }
 
 function buildUrl(type, boxSlug, reportId, role) {
   if (role === 'admin') return '/admin/reports';
-  if (type === 'forum_comment' && boxSlug && reportId) return `/box/${boxSlug}/post/${reportId}`;
-  if (boxSlug) return `/box/${boxSlug}/history`;
-  return '/';
+  if (type === 'forum_comment') return `/box/${boxSlug}/post/${reportId}`;
+  return `/box/${boxSlug}/history`;
 }
 
 function json(data, status = 200) {

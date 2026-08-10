@@ -56,7 +56,7 @@ export default function Cookie() {
               </p>
               <ul style={{ paddingLeft: 24, marginBottom: 24, marginTop: 16 }}>
                 <li><strong>Autenticazione (Supabase Auth):</strong> Salviamo un token sicuro per mantenerti connesso alla piattaforma mentre navighi tra le pagine. (Scadenza: fine sessione / configurazione cloud).</li>
-                <li><strong>Anonimato (Anon Token):</strong> Se usi la funzione di segnalazione anonima, salviamo un token segreto nel <code>localStorage</code> del tuo browser. Questo è l'unico modo per permetterti di leggere le risposte dei Rappresentanti senza dover creare un account o rivelare la tua identità. Se svuoti la cache, perdi l'accesso a queste risposte.</li>
+                <li><strong>Anonimato (Ownership server-side):</strong> Se invii una segnalazione anonima, il sistema crea un collegamento cifrato tra il tuo account e la segnalazione nella nostra tabella <code>report_owners</code> su Supabase, senza che i Rappresentanti possano vederlo. Questo ti permette di visualizzare le risposte e la chat su qualsiasi dispositivo, anche se svuoti la cache del browser. Nessun dato aggiuntivo viene salvato in locale per questo scopo.</li>
                 <li><strong>Preferenze UI:</strong> Potremmo salvare preferenze temporanee sull'interfaccia (es. modalità scura/chiara se implementata).</li>
               </ul>
 

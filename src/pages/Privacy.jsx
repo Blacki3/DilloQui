@@ -74,7 +74,7 @@ export default function Privacy() {
                 Raccogliamo il minimo indispensabile per far funzionare il servizio. Il trattamento si basa sul <strong>legittimo interesse</strong> di garantire la sicurezza informatica e sulla <strong>necessità contrattuale</strong> di fornire il servizio richiesto (erogazione della messaggistica).
               </p>
               <ul style={{ paddingLeft: 24, marginBottom: 24 }}>
-                <li><strong>Dati di Autenticazione:</strong> Indirizzo email (usato esclusivamente per l'invio del codice OTP), Nome, Cognome e Classe. L'email non viene mai mostrata agli altri utenti.</li>
+                <li><strong>Dati di Autenticazione:</strong> Indirizzo email, Nome, Cognome e Classe. L'email non viene mostrata agli altri studenti, ma è visibile ai Rappresentanti per eventuali comunicazioni.</li>
                 <li><strong>Contenuto delle Segnalazioni:</strong> I testi che scrivi nei report e nei commenti. Ti invitiamo a non inserire dati particolari (es. orientamento sessuale, salute) né nomi di terze persone se non strettamente necessario.</li>
                 <li><strong>Dati Tecnici di Navigazione:</strong> Indirizzo IP e User Agent vengono elaborati temporaneamente per prevenire attacchi informatici (DDoS) e abusi.</li>
               </ul>
@@ -93,7 +93,7 @@ export default function Privacy() {
                 6. Chi ha accesso ai tuoi dati?
               </h2>
               <p>
-                <strong>I Rappresentanti (Admin della Box):</strong> Vedono il contenuto delle segnalazioni. Vedono il tuo nome e classe <em>solo</em> se scegli di non usare la modalità anonima. Non hanno mai accesso alla tua email né al collegamento interno descritto al punto 2.<br />
+                <strong>I Rappresentanti (Admin della Box):</strong> Vedono il contenuto delle segnalazioni. Vedono il tuo nome e classe <em>solo</em> se scegli di non usare la modalità anonima. Hanno accesso al tuo indirizzo email (nella lista utenti della Box) esclusivamente per poterti contattare, ma non hanno accesso al collegamento interno descritto al punto 2 (quindi non sanno quali segnalazioni anonime hai inviato).<br />
                 <strong>Il Team DILLOQUI:</strong> Ha accesso ai log di sistema esclusivamente per manutenzione tecnica e non legge le conversazioni private se non richiesto dalle Autorità.<br />
                 <strong>Autorità Giudiziarie:</strong> In caso di mandato ufficiale per la prevenzione o repressione di reati.
               </p>

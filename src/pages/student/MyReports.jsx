@@ -37,7 +37,6 @@ export default function MyReports() {
               mine: true,
               chat: old?.chat || [], // popolata all'apertura o da realtime
               chatCount: r.chat_messages?.[0]?.count ?? 0,
-              anonToken: r.anon_token || null,
             };
           };
           return [...identified.map(mapReport), ...anonymous.map(mapReport)]
@@ -63,14 +62,14 @@ export default function MyReports() {
 
   // Carica i messaggi della chat e avvia WebSocket (solo reale)
   const fetchChatMessagesForReport = (rep) => {
-    const fetchMsgs = rep.anonToken
-      ? getAnonChatMessages(rep.id, rep.anonToken)
+    const fetchMsgs = rep.is_anonymous
+      ? getAnonChatMessages(rep.id)
       : getChatMessages(rep.id);
 
     return fetchMsgs
       .then(msgs => {
         const mapped = msgs.map(m => {
-          const isAdmin = rep.anonToken ? !!m.author_id : m.author_id !== profile?.id;
+          const isAdmin = rep.is_anonymous ? !!m.author_id : m.author_id !== profile?.id;
           return {
             id: m.id,
             text: m.content,
@@ -125,9 +124,9 @@ export default function MyReports() {
     } else {
       try {
         const rep = realReports.find(r => r.id === id);
-        if (rep?.anonToken) {
-          // Segnalazione anonima: passa dal token (le RLS non riconoscono l'autore)
-          await updateAnonReportStatus(id, rep.anonToken, newStatus);
+        if (rep?.is_anonymous) {
+          // Segnalazione anonima: autenticata via JWT/report_owners lato server
+          await updateAnonReportStatus(id, newStatus);
         } else {
           await updateReport(id, { status: newStatus });
         }
@@ -146,8 +145,8 @@ export default function MyReports() {
     } else {
       try {
         const rep = realReports.find(r => r.id === reportId);
-        const saved = rep?.anonToken
-          ? await sendAnonChatMessage({ reportId, anonToken: rep.anonToken, content: chatInput.trim() })
+        const saved = rep?.is_anonymous
+          ? await sendAnonChatMessage({ reportId, content: chatInput.trim() })
           : await sendChatMessage({ reportId, content: chatInput.trim() });
         const newMsg = {
           id: saved.id,

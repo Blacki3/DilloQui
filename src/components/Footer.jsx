@@ -41,7 +41,7 @@ export default function Footer() {
       </div>
       <div style={{ width: 80, height: 3, background: 'var(--b-gray)', margin: '0 auto 24px' }} />
       <p style={{ margin: 0, fontSize: '0.8rem', color: 'var(--b-gray)', fontFamily: "'IBM Plex Mono', monospace" }}>
-        &copy; {new Date().getFullYear()} DILLOQUI. Piattaforma per Rappresentanti degli Studenti. Tutti i diritti riservati.
+        &copy; {new Date().getFullYear()} DILLOQUI. Tutti i diritti riservati.
       </p>
     </footer>
   );

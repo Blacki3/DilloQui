@@ -33,7 +33,7 @@ export default function Tendenze() {
     if (isDemo) return;
     setLoading(true);
     getPublicReports(slug)
-      .then(data => setRealReports(data.map(r => {
+      .then(({ posts }) => setRealReports(posts.map(r => {
         const createdAt = new Date(r.created_at).getTime();
         return {
           ...r,
