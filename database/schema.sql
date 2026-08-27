@@ -6,7 +6,6 @@
 -- ============================================================
 -- DILLO QUI — Schema Database v1.1
 -- Sistema di anonimato: token casuale generato lato client.
--- Da eseguire nel SQL Editor di Supabase (una sola volta).
 -- ============================================================
 
 -- 1. Tabella BOXES (Gli sportelli delle scuole)
