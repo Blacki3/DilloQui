@@ -1,4 +1,4 @@
-﻿-- ============================================================
+-- ============================================================
 -- DILLO QUI — Schema Database v1.2
 -- ============================================================
 -- Sistema di anonimato: token casuale generato lato client.
@@ -25,7 +25,7 @@ CREATE TABLE public.profiles (
   nome          TEXT,
   cognome       TEXT,
   classe        TEXT,
-  box_slug      TEXT        REFERENCES public.boxes(slug) ON DELETE SET NULL,
+  box_slug      TEXT        REFERENCES public.boxes(slug) ON DELETE SET NULL ON UPDATE CASCADE,
   default_anon  BOOLEAN     NOT NULL DEFAULT TRUE,
   notifications BOOLEAN     NOT NULL DEFAULT TRUE,
   created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
@@ -37,7 +37,7 @@ CREATE TABLE public.profiles (
 --   Segnalazione ANONIMA:      author_id = NULL,         anon_token = NULL (ownership server-side)
 CREATE TABLE public.reports (
   id           UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
-  box_slug     TEXT        NOT NULL REFERENCES public.boxes(slug) ON DELETE CASCADE,
+  box_slug     TEXT        NOT NULL REFERENCES public.boxes(slug) ON DELETE CASCADE ON UPDATE CASCADE,
   author_id    UUID        REFERENCES public.profiles(id) ON DELETE SET NULL,
   anon_token   UUID,       -- Colonna legacy: sostituita da report_owners
   type         TEXT        NOT NULL,

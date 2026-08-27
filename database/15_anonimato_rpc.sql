@@ -1,4 +1,4 @@
-﻿-- ============================================================
+-- ============================================================
 -- DILLO QUI — Anonimato Sicuro: RPC JWT
 -- ============================================================
 -- Idempotente. Non rieseguire gli script storici P0/P1/fixes dopo P7.
@@ -79,7 +79,7 @@ CREATE POLICY "Utente crea il proprio profilo" ON public.profiles
 CREATE OR REPLACE FUNCTION public.validate_user_content()
 RETURNS TRIGGER
 LANGUAGE plpgsql
-SECURITY INVOKER
+SECURITY DEFINER
 SET search_path = public
 AS $$
 BEGIN

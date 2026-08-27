@@ -32,7 +32,7 @@ export default function Footer() {
         }} onMouseEnter={e => e.target.style.color = 'var(--b-yellow)'} onMouseLeave={e => e.target.style.color = 'var(--b-gray-l)'}>
           Termini di Servizio
         </Link>
-        <a href="mailto:info@dilloqui.it" style={{
+        <a href="mailto:info.dilloqui@gmail.com" style={{
           color: 'var(--b-gray-l)', fontSize: '0.9rem', textDecoration: 'none',
           fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em',
         }} onMouseEnter={e => e.target.style.color = 'var(--b-yellow)'} onMouseLeave={e => e.target.style.color = 'var(--b-gray-l)'}>

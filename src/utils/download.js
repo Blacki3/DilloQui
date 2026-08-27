@@ -85,5 +85,5 @@ export function supportMailto({ slug, role = 'student' } = {}) {
     `Ruolo: ${role}`,
     slug ? `Box: ${slug}` : null,
   ].filter(Boolean).join('\n');
-  return `mailto:supporto@dilloqui.netlify.app?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+  return `mailto:info.dilloqui@gmail.com?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
 }

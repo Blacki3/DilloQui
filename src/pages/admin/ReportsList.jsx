@@ -1001,10 +1001,14 @@ export default function ReportsList() {
               }}
               role="button"
               tabIndex={0}
-              onClick={() => openReportDetail(report.id)}
+              onClick={() => {
+                if (report.status === STATUS.new) applyStatus(report.id, STATUS.in_review);
+                openReportDetail(report.id);
+              }}
               onKeyDown={(e) => {
                 if (e.key === 'Enter' || e.key === ' ') {
                   e.preventDefault();
+                  if (report.status === STATUS.new) applyStatus(report.id, STATUS.in_review);
                   openReportDetail(report.id);
                 }
               }}

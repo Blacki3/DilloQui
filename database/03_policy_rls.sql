@@ -1,4 +1,4 @@
-﻿-- ============================================================
+-- ============================================================
 -- DILLO QUI — RLS Policies
 -- ============================================================
 
@@ -48,7 +48,7 @@ CREATE POLICY "Admin puo aggiornare il proprio box" ON public.boxes
   FOR UPDATE USING (
     public.get_my_role() = 'admin' AND
     public.get_my_box_slug() = boxes.slug
-  );
+  ) WITH CHECK (true);
 
 -- ============================================================
 -- TABELLA: profiles

@@ -146,8 +146,8 @@ export default function About() {
             fontWeight: 500,
             margin: '0 0 32px',
           }}>
-            Abbiamo così iniziato a progettare una piattaforma che potesse essere semplice da usare, sicura e accessibile a tutti.  Creando una prima versione ai tempi chiamata semplicemnte "Sportello di Ascolto". Molto piu semplice dell'attuale ma con lo stesso scopo.
-            Oggi Dillo Qui è una piattaforma reale, usata realmente,{' '}
+            Abbiamo così iniziato a progettare una piattaforma che potesse essere semplice da usare, sicura e accessibile a tutti.  Creando una prima versione ai tempi chiamata semplicemente "Sportello di Ascolto". Molto piu semplice dell'attuale ma con lo stesso scopo.
+            Oggi Dillo Qui è una piattaforma reale,{' '}
             <span style={{
               color: 'var(--b-black)',
               fontWeight: 900,

@@ -178,7 +178,7 @@ export default function NewReport() {
         // REALE: salva su Supabase
         await createReport({
           boxSlug: slug,
-          type: resolveStoredType(tipo, categoryOptions[0]),
+          type: tipo,
           title: titolo.trim(),
           content: problema.trim(),
           isPublic,
@@ -498,7 +498,7 @@ export default function NewReport() {
 
       <Popup
         show={showPopup}
-        title="✓ Inviata con successo!"
+        title="Inviata con successo!"
         message={isPublic ? 'La tua segnalazione è ora visibile nella Bacheca.' : 'La tua segnalazione è stata inviata privatamente ai referenti.'}
         onClose={() => { setShowPopup(false); navigate(`/box/${slug}/${isPublic ? 'forum' : 'history'}`); }}
       />

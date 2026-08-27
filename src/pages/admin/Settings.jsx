@@ -1,4 +1,4 @@
-﻿import { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { Check, Link, Plus, Trash2, ScrollText, Save } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useLocation } from 'react-router-dom';
@@ -8,7 +8,7 @@ import ConfirmModal from '../../components/ConfirmModal';
 // Mock (solo per la demo)
 import { getSettings as getSettingsMock, saveSettings as saveSettingsMock } from '../../services/mockSettings';
 // Reale
-import { getBoxAdmin, updateBox } from '../../services/db';
+import { getBoxAdmin, updateBox, getBox } from '../../services/db';
 
 function BrutToggle({ on, onClick }) {
   return (
@@ -34,7 +34,7 @@ function BrutToggle({ on, onClick }) {
 
 export default function Settings() {
   const location = useLocation();
-  const { profile } = useAuth();
+  const { profile, refreshProfile } = useAuth();
   const isDemo = location.pathname.startsWith('/demo/admin');
   const boxSlug = isDemo ? 'demo' : profile?.box_slug;
 
@@ -114,7 +114,7 @@ export default function Settings() {
       const current = getSettingsMock();
       const saved = saveSettingsMock({
         ...current,
-        slug,
+        slug: payload.slug ?? slug,
         emailFilterMode: payload.email_filter_mode,
         whitelist: payload.whitelist,
         requireClass: payload.require_class,
@@ -138,14 +138,31 @@ export default function Settings() {
   };
 
   const handleSaveSlug = async () => {
+    if (slug === savedSlug) return;
+    if (slug.length < 3) {
+      showSave('Il link deve avere almeno 3 caratteri.', 'error');
+      return;
+    }
     setSavingSlug(true);
     try {
+      if (!isDemo) {
+        // Controllo disponibilità
+        const existing = await getBox(slug).catch(() => null);
+        if (existing && existing.slug !== savedSlug) {
+          showSave('Questo link è già in uso.', 'error');
+          setSavingSlug(false);
+          return;
+        }
+      }
+      
       await persistSettings({ slug });
       setSavedSlug(slug);
-      showSave('Impostazioni salvate.');
+      if (!isDemo) {
+        await refreshProfile();
+      }
+      showSave('Link aggiornato con successo.');
     } catch (e) {
-      showSave('Errore nel salvataggio.', 'error');
-      console.error(e);
+      showSave('Errore nell\'aggiornamento.', 'error');
     } finally {
       setSavingSlug(false);
     }
@@ -282,7 +299,6 @@ export default function Settings() {
       exit={{ opacity: 0, y: -15 }}
       transition={{ duration: 0.3 }}
     >
-      <AnimatePresence>
       {/* Header */}
       <div style={{ marginBottom: 28 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
@@ -328,9 +344,7 @@ export default function Settings() {
           <div>
             <h3 style={{ margin: 0, textTransform: 'uppercase', fontSize: '0.9rem' }}>Gestione Link</h3>
             <p style={{ color: 'var(--b-gray)', fontSize: '0.82rem', margin: 0 }}>
-              {isDemo
-                ? 'In demo puoi modificare lo slug e salvarlo in locale.'
-                : 'L\'indirizzo web della tua Box è fisso e non modificabile.'}
+              Puoi modificare l'indirizzo web del tuo sportello. Assicurati che sia disponibile.
             </p>
           </div>
         </div>
@@ -340,39 +354,37 @@ export default function Settings() {
           <input
             type="text"
             value={slug}
-            readOnly={!isDemo}
-            onChange={isDemo ? (e) => setSlug(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '')) : undefined}
-            style={{ flex: 1, margin: 0, border: 'none', background: 'transparent', boxShadow: 'none', padding: '12px 14px', fontSize: '1rem', fontWeight: 800, color: isDemo ? 'var(--b-black)' : 'var(--b-gray)', outline: 'none', fontFamily: "'IBM Plex Mono', monospace", cursor: isDemo ? 'text' : 'default' }}
+            onChange={(e) => setSlug(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ''))}
+            style={{ flex: 1, margin: 0, border: 'none', background: 'transparent', boxShadow: 'none', padding: '12px 14px', fontSize: '1rem', fontWeight: 800, color: 'var(--b-black)', outline: 'none', fontFamily: "'IBM Plex Mono', monospace" }}
             id="settings-slug-input"
           />
-          {isDemo && (
-            <button
-              type="button"
-              className="btn-primary settings-url-btn"
-              onClick={handleSaveSlug}
-              disabled={savingSlug || !slug.trim() || slug === savedSlug}
-              id="settings-slug-save"
-              style={{
-                display: 'flex', alignItems: 'center', gap: 6,
-                padding: '0 18px', border: 'none', borderLeft: '2px solid var(--b-black)',
-                boxShadow: 'none', fontSize: '0.78rem', letterSpacing: '0.04em',
-                alignSelf: 'stretch', flexShrink: 0, minWidth: 100, borderRadius: 0,
-              }}
-            >
-              {savingSlug ? '...' : (
-                <>
-                  <Save size={16} strokeWidth={2.5} /> Salva
-                </>
-              )}
-            </button>
-          )}
+          <button
+            type="button"
+            className="btn-primary settings-url-btn"
+            onClick={handleSaveSlug}
+            disabled={savingSlug || !slug.trim() || slug === savedSlug}
+            id="settings-slug-save"
+            style={{
+              display: 'flex', alignItems: 'center', gap: 6,
+              padding: '0 18px', border: 'none', borderLeft: '2px solid var(--b-black)',
+              boxShadow: 'none', fontSize: '0.78rem', letterSpacing: '0.04em',
+              alignSelf: 'stretch', flexShrink: 0, minWidth: 100, borderRadius: 0,
+              width: 'auto'
+            }}
+          >
+            {savingSlug ? '...' : (
+              <>
+                <Save size={16} strokeWidth={2.5} /> Salva
+              </>
+            )}
+          </button>
         </div>
         <div style={{
           fontSize: '0.78rem',
-          color: isDemo && slug !== savedSlug ? 'var(--b-orange)' : 'var(--b-green)',
+          color: slug !== savedSlug ? 'var(--b-orange)' : 'var(--b-green)',
           display: 'flex', alignItems: 'center', gap: 4, fontWeight: 800, marginLeft: 2,
         }}>
-          <Check size={13} strokeWidth={3} /> {isDemo && slug !== savedSlug ? 'Modifiche non salvate' : 'Link attivo'}
+          <Check size={13} strokeWidth={3} /> {slug !== savedSlug ? 'Modifiche non salvate' : 'Link attivo'}
         </div>
       </div>
 
@@ -549,7 +561,6 @@ export default function Settings() {
           </div>
         </div>
       </div>
-      </AnimatePresence>
 
       <ConfirmModal
         isOpen={showResetModal}

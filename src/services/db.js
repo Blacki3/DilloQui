@@ -138,12 +138,35 @@ export async function checkEmailAllowed(slug, email) {
  * @param {object} updates — campi da aggiornare (name, whitelist, categories, require_class, notif_emails, email_filter_mode, regolamento)
  */
 export async function updateBox(slug, updates) {
-  const { data, error } = await supabase
-    .from('boxes')
-    .update(updates)
-    .eq('slug', slug)
-    .select()
-    .single();
+  // Se stiamo cambiando lo slug, usiamo una RPC dedicata per evitare
+  // conflitti RLS causati da ON UPDATE CASCADE sulla tabella profiles.
+  if (updates.slug && updates.slug !== slug) {
+    const { error: rpcError } = await supabase.rpc('update_box_slug', {
+      old_slug: slug,
+      new_slug: updates.slug
+    });
+    if (rpcError) throw rpcError;
+    
+    // Aggiorniamo la variabile slug locale per le successive modifiche
+    slug = updates.slug;
+  }
+
+  // Rimuoviamo lo slug dall'oggetto updates per il normale update
+  const { slug: _slugToRemove, ...otherUpdates } = updates;
+  
+  if (Object.keys(otherUpdates).length > 0) {
+    const { data, error } = await supabase
+      .from('boxes')
+      .update(otherUpdates)
+      .eq('slug', slug)
+      .select()
+      .single();
+    if (error) throw error;
+    return data;
+  }
+  
+  // Se abbiamo aggiornato solo lo slug, facciamo una GET per restituire il box
+  const { data, error } = await supabase.from('boxes').select('*').eq('slug', slug).single();
   if (error) throw error;
   return data;
 }
@@ -407,6 +430,7 @@ export async function createReport({ boxSlug, type, title, content, isPublic, is
     .insert({
       box_slug: boxSlug,
       author_id: authorId,
+      anon_token: isAnonymous ? crypto.randomUUID() : null,
       type,
       title,
       content,
@@ -421,9 +445,9 @@ export async function createReport({ boxSlug, type, title, content, isPublic, is
 
   // Ownership privata (anche per anonime) → serve alle push senza esporre l'autore all'admin.
   // Preferibile il trigger SECURITY DEFINER AFTER INSERT (supabase_security_p2.sql);
-  // questo upsert resta come fallback se il trigger non è ancora deployato.
+  // questo insert resta come fallback se il trigger non è ancora deployato.
   try {
-    const { error: ownErr } = await supabase.from('report_owners').upsert({
+    const { error: ownErr } = await supabase.from('report_owners').insert({
       report_id: data.id,
       user_id: user.id,
     });
