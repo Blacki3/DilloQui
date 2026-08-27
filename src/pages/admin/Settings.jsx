@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+﻿import { useState, useEffect } from 'react';
 import { Check, Link, Plus, Trash2, ScrollText, Save } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useLocation } from 'react-router-dom';
@@ -81,7 +81,7 @@ export default function Settings() {
           setCategories((box.categories || []).map((name, idx) => ({ id: idx + 1, name })));
           setRegolamento(box.regolamento || '');
         })
-        .catch(console.error)
+        .catch(() => {})
         .finally(() => setLoading(false));
     } else if (profile) {
       // Profilo caricato ma senza box collegata: inutile aspettare oltre
@@ -159,7 +159,7 @@ export default function Settings() {
     try {
       await persistSettings({ categories: nextCategories.map(c => c.name.trim()).filter(Boolean) });
       showSave('Categorie aggiornate.');
-    } catch (e) { console.error(e); showSave('Errore nel salvataggio.', 'error'); }
+    } catch { showSave('Errore nel salvataggio.', 'error'); }
   };
 
   const handleRemoveCategory = async (id) => {
@@ -174,21 +174,21 @@ export default function Settings() {
       try {
         await persistSettings({ categories: ['Altro'] });
         showSave('Categoria ripristinata a “Altro”.');
-      } catch (e) { console.error(e); showSave('Errore nel salvataggio.', 'error'); }
+      } catch { showSave('Errore nel salvataggio.', 'error'); }
       return;
     }
     setCategories(nextCategories);
     try {
       await persistSettings({ categories: nextCategories.map(c => c.name.trim()).filter(Boolean) });
       showSave('Categoria rimossa.');
-    } catch (e) { console.error(e); showSave('Errore nel salvataggio.', 'error'); }
+    } catch { showSave('Errore nel salvataggio.', 'error'); }
   };
 
   const handleSaveWhitelist = async () => {
     try {
       await persistSettings({ whitelist: getEmailLines() });
       showSave('Whitelist salvata.');
-    } catch (e) { console.error(e); showSave('Errore nel salvataggio.', 'error'); }
+    } catch { showSave('Errore nel salvataggio.', 'error'); }
   };
 
   const handleToggleRequireClass = async () => {
@@ -197,7 +197,7 @@ export default function Settings() {
     try {
       await persistSettings({ require_class: next });
       showSave('Regola profilo aggiornata.');
-    } catch (e) { console.error(e); showSave('Errore nel salvataggio.', 'error'); }
+    } catch { showSave('Errore nel salvataggio.', 'error'); }
   };
 
   const handleSaveRegolamento = async () => {
@@ -440,7 +440,7 @@ export default function Settings() {
             try {
               await persistSettings({ email_filter_mode: nextMode });
               showSave(`Modalità filtro: ${nextMode === 'domain' ? 'Dominio' : 'Email Esatta'}.`);
-            } catch (e) { console.error(e); showSave('Errore nel salvataggio.', 'error'); }
+            } catch { showSave('Errore nel salvataggio.', 'error'); }
           }} />
         </div>
         <label>Lista Autorizzati ({emailFilterMode === 'domain' ? 'Dominio Autorizzato' : 'Email Esatte'})</label>
