@@ -1,6 +1,6 @@
 /* Service Worker DILLOQUI — Web Push + click sulla notifica */
 
-self.addEventListener('install', (event) => {
+self.addEventListener('install', () => {
   self.skipWaiting();
 });
 

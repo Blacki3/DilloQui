@@ -129,7 +129,10 @@ export function AuthProvider({ children }) {
 
   /**
    * Passo 1: invia OTP all'email dello studente.
-   * Passa box_slug / box_name nei metadata (usati dal trigger e dal template email).
+   * box_slug va nei metadata perché il trigger handle_new_user lo legge da lì
+   * per agganciare il profilo allo sportello. box_name lo accompagna ma oggi
+   * non lo usa nessuno: resta a disposizione di un template email che voglia
+   * nominare lo sportello.
    */
   const sendStudentOtp = async (email, boxSlug, boxName = '') => {
     // Niente emailRedirectTo: con OTP a codice non serve, e se l'URL

@@ -9,9 +9,9 @@ import NotificationPrefs from '../../components/NotificationPrefs';
 import { downloadTextFile, reportsToCsv, supportMailto } from '../../utils/download';
 import {
   Shield, Download, Lock, HelpCircle,
-  ChevronRight, BadgeCheck, LogOut, User, ArrowLeft, AlertTriangle
+  ChevronRight, BadgeCheck, LogOut, User, ArrowLeft
 } from 'lucide-react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion';
 import ConfirmModal from '../../components/ConfirmModal';
 
 function BrutRow({ icon: Icon, label, sublabel, right, onClick, disabled, title }) {

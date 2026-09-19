@@ -13,6 +13,14 @@ dist-ssr
 *.local
 .env
 .env.*
+# Il file di esempio non contiene chiavi e serve a chi clona la repo:
+# senza questa eccezione lo escluderebbe la riga .env.* qui sopra.
+!.env.example
+
+# Supabase CLI: stato del collegamento al progetto remoto.
+# Contiene il riferimento del progetto e la stringa di connessione al
+# pooler, che non hanno motivo di stare in una repo pubblica.
+supabase/.temp/
 
 # Editor directories and files
 .vscode/*

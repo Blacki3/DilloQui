@@ -1,10 +1,10 @@
-import { useState, useEffect } from 'react';
-import { Shield, ShieldBan, Trash2, User, Search } from 'lucide-react';
+import { useState, useEffect, useCallback } from 'react';
+import { Shield, ShieldBan, User, Search } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 // Mock (solo per la demo)
-import { getAllUsers, blockUser, deleteUser } from '../../services/mockProfiles';
+import { getAllUsers, blockUser } from '../../services/mockProfiles';
 // Reale
 import { getBoxUsers, toggleUserBan } from '../../services/db';
 
@@ -17,7 +17,7 @@ export default function UsersList() {
   const isDemo = location.pathname.startsWith('/demo/admin');
   const boxSlug = isDemo ? 'demo' : profile?.box_slug;
 
-  const loadUsers = async () => {
+  const loadUsers = useCallback(async () => {
     setLoading(true);
     try {
       if (isDemo) {
@@ -31,9 +31,9 @@ export default function UsersList() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [isDemo, boxSlug]);
 
-  useEffect(() => { loadUsers(); }, [isDemo, boxSlug]);
+  useEffect(() => { loadUsers(); }, [loadUsers]);
 
   // Profilo admin senza sportello collegato
   if (!isDemo && profile && !boxSlug) {

@@ -116,7 +116,6 @@ export default function StudentProfile({ email = 'student@scuola.edu.it' }) {
   const [nome, setNome] = useState(displayProfile.nome || '');
   const [cognome, setCognome] = useState(displayProfile.cognome || '');
   const [classe, setClasse] = useState(displayProfile.classe || '');
-  const [settings, setSettings] = useState(null);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [actionMsg, setActionMsg] = useState('');
   const [actionOk, setActionOk] = useState(true);

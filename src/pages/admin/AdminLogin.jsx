@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { ShieldCheck, ArrowRight, AlertCircle } from 'lucide-react';
+import { ShieldCheck, ArrowRight, AlertCircle, MailCheck } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
+import { supabase } from '../../lib/supabaseClient';
 import { friendlyError } from '../../utils/friendlyError';
 import { getAdminProfile, saveAdminProfile } from '../../services/mockProfiles';
 import BrandWordmark from '../../components/BrandWordmark';
@@ -21,6 +22,7 @@ export default function AdminLogin() {
   const [acceptedTerms, setAcceptedTerms] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [recoverySent, setRecoverySent] = useState('');
   const navigate = useNavigate();
   const { loginAdmin, loginAdminReal, registerAdminReal, isRealAdminAuthenticated, isAdminAuthenticated } = useAuth();
 
@@ -86,6 +88,33 @@ export default function AdminLogin() {
     }
   };
 
+  // Il link contenuto nell'email riporta su questa stessa pagina: al rientro
+  // Supabase emette PASSWORD_RECOVERY e PasswordRecoveryModal, montato a
+  // livello di App, chiede la nuova password sopra qualunque rotta.
+  const handleForgotPassword = async () => {
+    setError('');
+    setRecoverySent('');
+
+    const target = email.trim().toLowerCase();
+    if (!target) {
+      setError('Inserisci la tua email, poi richiedi il recupero.');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const { error: resetError } = await supabase.auth.resetPasswordForEmail(target, {
+        redirectTo: `${window.location.origin}/admin/login`,
+      });
+      if (resetError) throw resetError;
+      setRecoverySent(target);
+    } catch (err) {
+      setError(friendlyError(err, 'Invio email non riuscito. Riprova tra qualche minuto.'));
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <div className="app-container">
       <div style={{ width: '100%', maxWidth: 460, position: 'relative', zIndex: 1 }}>
@@ -113,7 +142,7 @@ export default function AdminLogin() {
           <div className="auth-tab-bar">
             <button
               className={`auth-tab ${!isRegistering ? 'active' : ''}`}
-              onClick={() => setIsRegistering(false)}
+              onClick={() => { setIsRegistering(false); setRecoverySent(''); }}
               type="button"
               id="admin-tab-login"
             >
@@ -121,7 +150,7 @@ export default function AdminLogin() {
             </button>
             <button
               className={`auth-tab ${isRegistering ? 'active' : ''}`}
-              onClick={() => setIsRegistering(true)}
+              onClick={() => { setIsRegistering(true); setRecoverySent(''); }}
               type="button"
               id="admin-tab-register"
             >
@@ -195,6 +224,35 @@ export default function AdminLogin() {
               required
               id="admin-password-input"
             />
+
+            {!isRegistering && !isDemo && (
+              <button
+                type="button"
+                onClick={handleForgotPassword}
+                disabled={loading}
+                id="admin-forgot-password"
+                style={{
+                  display: 'block', textAlign: 'left', marginTop: 8,
+                  background: 'none', border: 'none', padding: 0,
+                  font: 'inherit', fontSize: '0.8rem', fontWeight: 700,
+                  color: 'var(--b-gray)',
+                  textDecoration: 'underline', textUnderlineOffset: 3,
+                  cursor: loading ? 'not-allowed' : 'pointer',
+                }}
+              >
+                Password dimenticata?
+              </button>
+            )}
+
+            {recoverySent && (
+              <div className="msg success" style={{ marginTop: 8 }}>
+                <MailCheck size={16} strokeWidth={2.5} />
+                <span>
+                  Email inviata a <strong>{recoverySent}</strong>. Apri il link dal
+                  messaggio: tornerai qui e potrai scegliere una nuova password.
+                </span>
+              </div>
+            )}
 
             {error && (
               <div className="msg error" style={{ marginTop: 8 }}>

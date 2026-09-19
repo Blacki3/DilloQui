@@ -4,9 +4,8 @@ import { AnimatePresence, motion } from 'framer-motion';
 import {
   Zap, CheckCircle2, ArrowRight,
   Users, Landmark, Building2, Clock,
-  Link as LinkIcon, Tags, Library, Megaphone, Eye
+  Link as LinkIcon, Tags, Library, Megaphone
 } from 'lucide-react';
-import BrandWordmark from '../components/BrandWordmark';
 import Footer from '../components/Footer';
 
 const IncognitoIcon = ({ size = 24 }) => (

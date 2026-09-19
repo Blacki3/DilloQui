@@ -20,23 +20,24 @@ DilloQui è una web application moderna (SPA) con un'architettura Serverless bas
 *   **Backend & Database:** Supabase (PostgreSQL)
 *   **Autenticazione:** Supabase Auth (JWT, Magic Link / OTP per gli studenti, Email+Password per gli admin)
 *   **Serverless:** Supabase Edge Functions (Deno) per l'invio delle notifiche push
-*   **PWA:** Supporto per Web Push Notifications e installazione locale
+*   **PWA:** Web Push Notifications e installazione sul dispositivo (manifest + Service Worker). L'app richiede la connessione: non è previsto un uso offline.
 
 ## 🛡 Sicurezza & Privacy by Design (Core Feature)
 
 Il cuore del progetto è il nostro sistema di gestione dell'anonimato. 
 A differenza dei sistemi tradizionali dove il backend conosce l'utente ma "finge" di non saperlo, DilloQui utilizza un **doppio binario di sicurezza a livello di Database (RLS)**:
 
-1.  **Vista Admin (`reports_admin_view`)**: Gli amministratori interrogano una vista che oscura programmaticamente l'identità dell'autore per i post anonimi. Non c'è modo per un admin di risalire allo studente.
-2.  **Tabella Privata (`report_owners`)**: Quando uno studente crea un report anonimo, un trigger del database (invisibile al client) registra la proprietà in una tabella accessibile solo da funzioni `SECURITY DEFINER`.
+1.  **Vista Admin (`reports_admin_view`)**: Gli amministratori interrogano una vista che oscura programmaticamente l'identità dell'autore per i post anonimi. Non c'è modo per un admin di risalire allo studente. La vista è `security_invoker`, quindi continua a rispettare la RLS di chi la interroga: ogni admin vede solo il proprio sportello.
+2.  **Tabella Privata (`report_owners`)**: Quando uno studente crea un report anonimo, un trigger del database (invisibile al client) registra la proprietà in una tabella che nessun client può scrivere e di cui ciascuno legge soltanto le proprie righe.
 3.  **Comunicazione Bidirezionale**: Grazie a questo sistema, lo studente e l'admin possono **chattare in tempo reale** sulla segnalazione anonima. L'admin risponde al "Report #123" e il database sa a quale dispositivo inviare la notifica, senza mai rivelare il mittente all'admin.
+4.  **Nessun segreto nel browser**: l'autore anonimo si autentica con il proprio JWT, non con un token conservato sul dispositivo. Così l'accesso alla propria segnalazione non si perde cambiando telefono e non si trasferisce a chi intercettasse quel token.
 
 ## 📂 Struttura della Repository
 
 La repository è divisa nelle seguenti directory principali:
 
 *   **`/src/`** — Codice sorgente dell'applicazione React (Componenti, Pagine, Hook, Servizi).
-*   **`/database/`** — Gli script SQL (numerati in ordine di esecuzione da 01 a 15) necessari per ricreare interamente la struttura del database PostgreSQL, incluse le policy RLS e i trigger. (Vedi il [README del database](database/README.md)).
+*   **`/database/`** — `installazione.sql` ricrea l'intera struttura del database PostgreSQL in un'unica esecuzione: tabelle, policy RLS, trigger, RPC e viste, ordinati per dipendenze. Accanto ci sono due script di servizio: `verifica_stato.sql`, che controlla se un database corrisponde a ciò che l'applicazione si aspetta, e `reset_completo.sql`, per ripartire da zero. (Vedi il [README del database](database/README.md)).
 *   **`/supabase/functions/`** — Codice backend (Edge Functions scritte in TypeScript/Deno) utilizzato ad esempio per l'invio sicuro delle Web Push Notifications.
 
 ## 🚀 Come avviare il progetto localmente
@@ -59,8 +60,19 @@ La repository è divisa nelle seguenti directory principali:
    ```
    *Apri `.env.local` e inserisci `VITE_SUPABASE_URL` e `VITE_SUPABASE_ANON_KEY`.*
 
-4. **Avvia il server di sviluppo**
+4. **Prepara il database**
+   Nel SQL Editor del tuo progetto Supabase esegui [`database/installazione.sql`](database/installazione.sql), poi [`database/verifica_stato.sql`](database/verifica_stato.sql) per conferma: nella colonna `esito` non deve comparire nessun «DA SISTEMARE».
+
+5. **Avvia il server di sviluppo**
    ```bash
    npm run dev
    ```
    L'app sarà disponibile su `http://localhost:5173`.
+
+   Per vedere l'interfaccia senza configurare nulla, apri `/box/demo`: la
+   modalità demo funziona interamente nel browser, con dati finti e senza
+   toccare Supabase.
+
+## 📄 Licenza
+
+Il codice è pubblicato in sola lettura, con **tutti i diritti riservati** — vedi [LICENSE](LICENSE). Le risorse di terze parti (icone, font, librerie) mantengono le proprie licenze, elencate in [ATTRIBUTIONS.md](ATTRIBUTIONS.md).

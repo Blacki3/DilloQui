@@ -32,6 +32,10 @@ Caricati da [Google Fonts](https://fonts.google.com/) in `src/index.css`.
 
 ---
 
+## Icone dell'app (PWA)
+
+`public/icon-192.png`, `public/icon-512.png` e `public/icon-maskable-512.png` non sono risorse di terzi: sono ritagli quadrati del marchio di `public/logo.png`, centrato sul giallo del progetto (`#FFD600`). La variante `maskable` ha un margine più ampio per non farsi tagliare dal ritaglio circolare di Android. Per cambiarle basta sostituire i tre file mantenendo le stesse dimensioni.
+
 ## Note
 
 Se si aggiungono nuove icone, immagini o font di terzi, aggiornare questo file.

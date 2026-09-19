@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useCallback } from 'react';
 import {
   Search, SlidersHorizontal, MessageSquare, ArrowLeft, Send, CheckCircle2, X, RotateCcw,
   Inbox, FilterX, ArrowDownUp, Globe, Lock, Users, ChevronLeft, ThumbsUp, Trash2,
@@ -500,7 +500,7 @@ export default function ReportsList() {
   // Si parte dalle più recenti; lo storico completo si carica su richiesta
   const [limite, setLimite] = useState(REPORTS_PAGE_SIZE);
 
-  const fetchReports = () => {
+  const fetchReports = useCallback(() => {
     if (isDemo || !boxSlug) return Promise.resolve();
     return getAllReports(boxSlug, { limit: limite })
       .then((data) => {
@@ -529,12 +529,12 @@ export default function ReportsList() {
         });
       })
       .catch(console.error);
-  };
+  }, [isDemo, boxSlug, limite]);
 
   useEffect(() => {
     setLoadingReports(true);
     fetchReports().finally(() => setLoadingReports(false));
-  }, [isDemo, boxSlug, limite]);
+  }, [fetchReports]);
 
   usePolling(fetchReports, 15000);
 
@@ -543,10 +543,16 @@ export default function ReportsList() {
   const realReadVersion = useAdminReadVersionReal();
   const readVersion = isDemo ? demoReadVersion : realReadVersion;
 
-  const checkUnread = (report) =>
-    isDemo ? hasUnreadForAdmin(report) : hasUnreadReal(report, adminId);
-  const checkAttention = (report) =>
-    isDemo ? needsAdminAttention(report) : needsAttentionReal(report, adminId);
+  // Entrano nelle dipendenze dei useMemo che filtrano la lista: senza
+  // un'identità stabile i conteggi si ricalcolerebbero a ogni render.
+  const checkUnread = useCallback(
+    (report) => (isDemo ? hasUnreadForAdmin(report) : hasUnreadReal(report, adminId)),
+    [isDemo, adminId],
+  );
+  const checkAttention = useCallback(
+    (report) => (isDemo ? needsAdminAttention(report) : needsAttentionReal(report, adminId)),
+    [isDemo, adminId],
+  );
 
   const [search, setSearch] = useState('');
   const [openChat, setOpenChat] = useState(null);
@@ -575,7 +581,7 @@ export default function ReportsList() {
       [STATUS.resolved]: countUnread(base.filter((r) => r.status === STATUS.resolved)),
       [STATUS.closed]: countUnread(base.filter((r) => r.status === STATUS.closed)),
     };
-  }, [reports, typeFilter, visibilityFilter, soloNonGestite, readVersion, isDemo, adminId]);
+  }, [reports, typeFilter, visibilityFilter, soloNonGestite, readVersion, checkAttention, checkUnread]);
 
   const filtersActive =
     statusFilter !== 'all' ||
@@ -605,7 +611,7 @@ export default function ReportsList() {
       );
     });
     return sortReports(list, sortBy);
-  }, [reports, search, statusFilter, typeFilter, visibilityFilter, soloNonGestite, sortBy, readVersion, isDemo, adminId]);
+  }, [reports, search, statusFilter, typeFilter, visibilityFilter, soloNonGestite, sortBy, readVersion, checkAttention]);
 
   const openReport = reports.find((r) => r.id === openChat);
   const isWide = useMediaQuery('(min-width: 1280px)');
@@ -636,7 +642,7 @@ export default function ReportsList() {
   }, [openChat, isDemo, adminId]);
 
   // Carica chat reale all'apertura del dettaglio e abilita WebSockets
-  const fetchChatMessages = (reportId) => {
+  const fetchChatMessages = useCallback((reportId) => {
     return getChatMessages(reportId)
       .then((msgs) => {
         const mapped = msgs.map((m) => {
@@ -660,7 +666,7 @@ export default function ReportsList() {
         if (adminId) markReportReadReal(adminId, reportId);
       })
       .catch(console.error);
-  };
+  }, [adminId]);
 
   useEffect(() => {
     if (isDemo || !openChat) return;
@@ -685,7 +691,7 @@ export default function ReportsList() {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [openChat, isDemo, adminId]);
+  }, [openChat, isDemo, fetchChatMessages, fetchReports]);
 
   useEffect(() => {
     try {
@@ -960,7 +966,9 @@ export default function ReportsList() {
       )}
 
       <div className="reports-list-scroll scrollbar-hidden">
-      {filtered.length === 0 && (
+      {/* Durante il primo caricamento la lista è vuota perché i dati non
+          sono ancora arrivati, non perché non ci siano segnalazioni */}
+      {!loadingReports && filtered.length === 0 && (
         <div className="reports-empty-state">
           <div className="reports-empty-icon" aria-hidden="true">
             {emptyVariant === 'filtered' ? <FilterX size={28} strokeWidth={2.5} /> : <Inbox size={28} strokeWidth={2.5} />}

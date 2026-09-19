@@ -1,7 +1,7 @@
 import { Link, useLocation, useParams, useNavigate, useOutlet } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Home, PlusCircle, History, Bell, User, FileText, TrendingUp, ScrollText, AlertTriangle } from 'lucide-react';
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import BrandWordmark from '../components/BrandWordmark';
 import { countDrafts } from '../services/draftStore';
 import { useNotifications, markAllNotificationsRead as mockMarkAllRead, markNotificationRead as mockMarkRead } from '../services/mockStore';
@@ -35,14 +35,14 @@ export default function StudentLayout() {
   const notifications = isDemo ? mockNotifications : realNotifications;
   const unreadCount = notifications.filter(n => !n.read).length;
 
-  const fetchNotifications = () => {
+  const fetchNotifications = useCallback(() => {
     if (isDemo) return Promise.resolve();
     return getNotifications()
       .then(setRealNotifications)
       .catch(() => {});
-  };
+  }, [isDemo]);
 
-  useEffect(() => { fetchNotifications(); }, [isDemo]);
+  useEffect(() => { fetchNotifications(); }, [fetchNotifications]);
   usePolling(fetchNotifications, 30000);
 
   // Sportello non ancora verificato: lo studente deve saperlo mentre lo usa,
@@ -83,7 +83,7 @@ export default function StudentLayout() {
       )
       .subscribe();
     return () => supabase.removeChannel(channel);
-  }, [isDemo, profile?.id]);
+  }, [isDemo, profile?.id, fetchNotifications]);
 
   // Preload in background delle altre rotte Studente
   useEffect(() => {

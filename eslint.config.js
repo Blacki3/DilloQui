@@ -31,7 +31,10 @@ export default [
       'react/react-in-jsx-scope': 'off',
       'react/prop-types': 'off',
       'react/no-unescaped-entities': 'off',
-      'no-unused-vars': ['warn', { argsIgnorePattern: '^_' }],
+      // Il trattino basso segnala «lo so che non lo uso»: serve per gli
+      // argomenti che vanno dichiarati per posizione e per le variabili
+      // estratte da una destrutturazione solo per escluderle dal resto.
+      'no-unused-vars': ['warn', { argsIgnorePattern: '^_', varsIgnorePattern: '^_' }],
       'react-refresh/only-export-components': 'off',
     },
     settings: {

@@ -1,4 +1,4 @@
-import { useState, useEffect, lazy, Suspense } from 'react';
+import { useState, useEffect, useCallback, lazy, Suspense } from 'react';
 import { Navigate } from 'react-router-dom';
 import { Lock, ShieldAlert } from 'lucide-react';
 import { motion } from 'framer-motion';
@@ -38,7 +38,10 @@ export default function PlatformGate() {
     return () => { cancelled = true; };
   }, [isPlatformAdmin]);
 
-  const lock = async () => {
+  // Identità stabile: PlatformBoxes la usa come dipendenza dell'effetto
+  // che carica gli sportelli, e una funzione nuova a ogni render lo
+  // farebbe ripartire in continuazione.
+  const lock = useCallback(async () => {
     setUnlocked(false);
     setPassword('');
     try {
@@ -46,7 +49,7 @@ export default function PlatformGate() {
     } catch {
       /* la sessione scade comunque da sola */
     }
-  };
+  }, []);
 
   if (authLoading || isPlatformAdmin === null) {
     return <Loader text="Verifica in corso..." />;

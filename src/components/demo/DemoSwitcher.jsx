@@ -32,7 +32,10 @@ const DemoIconSvg = ({ size = 24, className = "", style = {} }) => (
 );
 
 export default function DemoSwitcher() {
-  const { loginStudent, loginAdmin, studentToken, adminToken, logoutStudent, logoutAdmin } = useAuth();
+  // Nessun loginStudent: lo studente demo passa dal flusso OTP finto di
+  // /box/demo, così la giuria vede la verifica dell'email come la vedrebbe
+  // in una scuola. L'admin demo invece si autentica direttamente.
+  const { loginAdmin, studentToken, adminToken, logoutStudent, logoutAdmin } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
 

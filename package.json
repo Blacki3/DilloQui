@@ -2,7 +2,7 @@
   "name": "dilloqui",
   "description": "Sportello di ascolto digitale per le scuole — Progetto Marilli",
   "private": true,
-  "version": "0.5.0",
+  "version": "1.21.0",
   "type": "module",
   "scripts": {
     "dev": "vite",

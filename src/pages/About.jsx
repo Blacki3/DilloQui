@@ -1,6 +1,5 @@
 import { useNavigate } from 'react-router-dom';
-import { Users, Megaphone, ArrowRight, ChevronRight } from 'lucide-react';
-import BrandWordmark from '../components/BrandWordmark';
+import { ArrowRight, ChevronRight } from 'lucide-react';
 import Footer from '../components/Footer';
 
 export default function About() {

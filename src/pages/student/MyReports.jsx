@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { Lock, Eye, CheckCircle2, X, Send, MessageSquare, ArrowLeft } from 'lucide-react';
 import { useParams } from 'react-router-dom';
 import { useReports as useReportsMock, addMessage, setStatus as setStatusMock, STATUS, STATUS_LABEL, STATUS_BADGE_CLASS } from '../../services/mockStore';
@@ -22,7 +22,7 @@ export default function MyReports() {
   const [realReports, setRealReports] = useState([]);
   const [loadingReports, setLoadingReports] = useState(!isDemo);
 
-  const fetchReports = () => {
+  const fetchReports = useCallback(() => {
     if (isDemo) return Promise.resolve();
     return Promise.all([getMyReports(), getMyAnonReports()])
       .then(([identified, anonymous]) => {
@@ -44,12 +44,12 @@ export default function MyReports() {
         });
       })
       .catch(console.error);
-  };
+  }, [isDemo]);
 
   useEffect(() => {
     setLoadingReports(true);
     fetchReports().finally(() => setLoadingReports(false));
-  }, [isDemo]);
+  }, [fetchReports]);
 
   usePolling(fetchReports, 60000);
 

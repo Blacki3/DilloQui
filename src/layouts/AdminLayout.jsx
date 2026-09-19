@@ -1,8 +1,8 @@
-import { Link, useLocation, useNavigate, useOutlet } from 'react-router-dom';
+import { useLocation, useNavigate, useOutlet } from 'react-router-dom';
 import { LayoutDashboard, Settings as SettingsIcon, MessageSquareWarning, LogOut, Menu, X, User, PanelLeftClose, PanelLeftOpen, Users, BadgeCheck } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '../context/AuthContext';
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import BrandWordmark from '../components/BrandWordmark';
 import { useUnreadReportCount } from '../services/mockStore';
 import { useAdminReadVersionReal } from '../services/adminReadStore';
@@ -72,7 +72,7 @@ export default function AdminLayout() {
   }, []);
 
   // Badge reale: conteggio leggero status===new (si aggiorna al cambio rotta / mark-read)
-  const fetchBadgeCount = () => {
+  const fetchBadgeCount = useCallback(() => {
     if (isDemo || !boxSlug) {
       setRealNewCount(0);
       return Promise.resolve();
@@ -82,11 +82,11 @@ export default function AdminLayout() {
       .catch(() => {
         setRealNewCount(0);
       });
-  };
+  }, [isDemo, boxSlug]);
 
   useEffect(() => {
     fetchBadgeCount();
-  }, [isDemo, boxSlug, location.pathname, realReadVersion]);
+  }, [fetchBadgeCount, location.pathname, realReadVersion]);
 
   // Polling in background ogni 15 secondi per i contatori
   usePolling(fetchBadgeCount, 15000);

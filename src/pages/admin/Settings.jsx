@@ -1,8 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Check, Link, Plus, Trash2, ScrollText, Save } from 'lucide-react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion';
 import { useLocation } from 'react-router-dom';
-import CopyLinkButton from '../../components/CopyLinkButton';
 import { useAuth } from '../../context/AuthContext';
 import ConfirmModal from '../../components/ConfirmModal';
 // Mock (solo per la demo)

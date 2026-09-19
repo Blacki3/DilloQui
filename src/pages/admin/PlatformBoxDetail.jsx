@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { X, BadgeCheck, PauseCircle, PlayCircle, Trash2, ShieldAlert, Activity } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { getBoxDetail, setBoxVerified, setBoxSuspended, platformDeleteBox } from '../../services/db';
@@ -62,7 +62,7 @@ export default function PlatformBoxDetail({ slug, onClose, onChanged, onLock }) 
   const [confermaElimina, setConfermaElimina] = useState(null);
   const dialogRef = useDialog(true, onClose);
 
-  const handleError = (err, fallback) => {
+  const handleError = useCallback((err, fallback) => {
     const message = err?.message || '';
     if (message.includes('Permesso negato')) {
       onLock?.();
@@ -70,9 +70,9 @@ export default function PlatformBoxDetail({ slug, onClose, onChanged, onLock }) 
     }
     console.error(fallback, err);
     setError(message || fallback);
-  };
+  }, [onLock]);
 
-  const load = async () => {
+  const load = useCallback(async () => {
     setLoading(true);
     try {
       setD(await getBoxDetail(slug));
@@ -82,9 +82,9 @@ export default function PlatformBoxDetail({ slug, onClose, onChanged, onLock }) 
     } finally {
       setLoading(false);
     }
-  };
+  }, [slug, handleError]);
 
-  useEffect(() => { load(); }, [slug]);
+  useEffect(() => { load(); }, [load]);
 
   const azione = async (fn) => {
     if (busy) return;

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { BadgeCheck, ShieldAlert, Search, Building2, RefreshCw, X, Lock, PauseCircle } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { listBoxesOverview, setBoxVerified } from '../../services/db';
@@ -46,7 +46,7 @@ export default function PlatformBoxes({ onLock }) {
 
   // Lo sblocco scade dopo 30 minuti: da lì in poi ogni RPC risponde
   // "Permesso negato" e va richiesta di nuovo la password.
-  const handleError = (err, fallback) => {
+  const handleError = useCallback((err, fallback) => {
     const message = err?.message || '';
     if (message.includes('Permesso negato')) {
       onLock?.();
@@ -54,7 +54,7 @@ export default function PlatformBoxes({ onLock }) {
     }
     console.error(fallback, err);
     setError(message || fallback);
-  };
+  }, [onLock]);
 
   const openConfirm = (box) => {
     setTarget(box);
@@ -71,7 +71,7 @@ export default function PlatformBoxes({ onLock }) {
   // nello stesso ordine a ogni render.
   const confirmRef = useDialog(!!target, closeConfirm);
 
-  const load = async () => {
+  const load = useCallback(async () => {
     setLoading(true);
     setError('');
     try {
@@ -81,9 +81,9 @@ export default function PlatformBoxes({ onLock }) {
     } finally {
       setLoading(false);
     }
-  };
+  }, [handleError]);
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => { load(); }, [load]);
 
   if (loading && !boxes.length) {
     return (

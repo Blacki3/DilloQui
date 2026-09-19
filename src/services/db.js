@@ -416,6 +416,7 @@ export async function getMyAnonReports() {
  * @param {string} params.content
  * @param {boolean} params.isPublic
  * @param {boolean} params.isAnonymous
+ * @returns {Promise<{id: string}>} solo l'id: la riga non viene riletta.
  */
 export async function createReport({ boxSlug, type, title, content, isPublic, isAnonymous }) {
   const { data: { user } } = await supabase.auth.getUser();
@@ -425,9 +426,18 @@ export async function createReport({ boxSlug, type, title, content, isPublic, is
   // L'ownership è tracciata nella tabella report_owners (server-side).
   const authorId = isAnonymous ? null : user.id;
 
-  const { data, error } = await supabase
+  // L'id lo genera il client perché la riga NON va richiesta indietro: una
+  // segnalazione anonima non supera nessuna policy di SELECT su reports —
+  // author_id è NULL per scelta, e se è privata non vale nemmeno quella sui
+  // post pubblici — quindi un INSERT ... RETURNING verrebbe respinto dalla
+  // RLS annullando anche la scrittura. L'autore la rilegge da
+  // get_my_anon_reports().
+  const reportId = crypto.randomUUID();
+
+  const { error } = await supabase
     .from('reports')
     .insert({
+      id: reportId,
       box_slug: boxSlug,
       author_id: authorId,
       anon_token: isAnonymous ? crypto.randomUUID() : null,
@@ -437,38 +447,28 @@ export async function createReport({ boxSlug, type, title, content, isPublic, is
       is_public: isPublic,
       is_anonymous: isAnonymous,
       status: 'new',
-    })
-    .select(REPORT_SAFE_COLS)
-    .single();
+    });
 
   if (error) throw error;
 
-  // Ownership privata (anche per anonime) → serve alle push senza esporre l'autore all'admin.
-  // Preferibile il trigger SECURITY DEFINER AFTER INSERT (supabase_security_p2.sql);
-  // questo insert resta come fallback se il trigger non è ancora deployato.
-  try {
-    const { error: ownErr } = await supabase.from('report_owners').insert({
-      report_id: data.id,
-      user_id: user.id,
-    });
-    if (ownErr) console.warn('report_owners fallback:', ownErr);
-  } catch (ownErr) {
-    console.warn('report_owners fallback:', ownErr);
-  }
+  // L'ownership privata (report_owners) la registra il trigger
+  // claim_report_owner lato database: la tabella non ha policy INSERT,
+  // altrimenti si potrebbe rivendicare la segnalazione di un altro e
+  // leggerne la chat anonima.
 
   // Avvisa gli admin della box (best-effort)
   const { notifyEvent } = await import('./push');
   notifyEvent({
     type: 'new_report',
     boxSlug,
-    reportId: data.id,
-    eventId: data.id,
+    reportId,
+    eventId: reportId,
     title: 'Nuova segnalazione',
     body: 'È stata inviata una nuova segnalazione.',
     excludeUserId: user.id,
   });
 
-  return data;
+  return { id: reportId };
 }
 
 /**
@@ -540,11 +540,16 @@ export async function addComment({ reportId, content, isAnonymous }) {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error('Non autenticato');
 
+  // Come per le segnalazioni: nei commenti anonimi author_id è NULL e il
+  // vincolo chk_comment_author pretende un anon_token al suo posto.
+  // Il token non serve a rileggere il commento (nessun client può
+  // selezionarlo), tiene solo insieme le due metà del vincolo.
   const payload = {
     report_id: reportId,
     content,
     is_anonymous: isAnonymous,
     author_id: isAnonymous ? null : user.id,
+    anon_token: isAnonymous ? crypto.randomUUID() : null,
   };
 
   const { data, error } = await supabase
@@ -644,12 +649,14 @@ export async function sendAnonChatMessage({ reportId, content }) {
   if (error) throw error;
   const saved = Array.isArray(data) ? data[0] : data;
 
+  // Il box arriva dalla RPC: la riga di una segnalazione anonima privata
+  // non è leggibile dalla tabella (author_id è NULL), quindi una query su
+  // reports tornerebbe vuota e la notifica partirebbe senza destinatari.
   const { data: { user } } = await supabase.auth.getUser();
-  const { data: report } = await supabase.from('reports').select('box_slug, title').eq('id', reportId).maybeSingle();
   const { notifyEvent } = await import('./push');
   notifyEvent({
     type: 'chat_message',
-    boxSlug: report?.box_slug,
+    boxSlug: saved?.box_slug,
     reportId,
     eventId: saved?.id,
     title: 'Nuovo messaggio',

@@ -69,7 +69,7 @@ export default function PostDetail() {
   const [realComments, setRealComments] = useState([]);
   const [loadingPost, setLoadingPost] = useState(!isDemo);
 
-  const fetchPost = () => {
+  const fetchPost = useCallback(() => {
     if (isDemo) return Promise.resolve();
     return Promise.all([getReport(postId), getComments(postId), hasVoted(postId)])
       .then(([post, comments, voted]) => {
@@ -95,13 +95,13 @@ export default function PostDetail() {
         })));
       })
       .catch(console.error);
-  };
+  }, [isDemo, postId]);
 
   useEffect(() => {
     if (isDemo) return;
     setLoadingPost(true);
     fetchPost().finally(() => setLoadingPost(false));
-  }, [isDemo, postId]);
+  }, [isDemo, fetchPost]);
 
   // Le risposte degli altri arrivano mentre stai leggendo la discussione.
   // Il commento appena scritto è già in lista: al giro successivo viene
