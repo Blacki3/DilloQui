@@ -2,9 +2,13 @@
   command = "npm run build"
   publish = "dist"
 
-# Branch deploy `mostra` → URL tipo https://mostra--TUOSITO.netlify.app
+# Branch deploys (non-production) → splash PROVAMI
+# URL tipo https://cursor-mostra-provami-splash--TUOSITO.netlify.app
 # Attiva Branch deploys in Netlify → Site settings → Build & deploy → Branches
-[context.mostra.environment]
+[context.branch-deploy.environment]
+  VITE_MOSTRA = "true"
+
+[context.deploy-preview.environment]
   VITE_MOSTRA = "true"
 
 [context.production.environment]
