@@ -1,4 +1,4 @@
-import { useEffect, Suspense, lazy } from 'react';
+import { useEffect, useState, Suspense, lazy } from 'react';
 import { Routes, Route, Navigate, useParams, useLocation } from 'react-router-dom';
 import PublicLayout from './layouts/PublicLayout';
 import Landing from './pages/Landing';
@@ -13,6 +13,9 @@ const Cookie = lazy(() => import('./pages/Cookie'));
 import AdminLogin from './pages/admin/AdminLogin';
 import PasswordRecoveryModal from './components/PasswordRecoveryModal';
 import DemoSwitcher from './components/demo/DemoSwitcher';
+import ProvamiSplash from './components/ProvamiSplash';
+
+const IS_MOSTRA = import.meta.env.VITE_MOSTRA === 'true';
 
 // Helper per il preloading in background
 const lazyWithPreload = (factory) => {
@@ -125,8 +128,21 @@ function App() {
   // prima che il server abbia risposto.
   const platformUnknown = authLoading || isPlatformAdmin === null;
 
+  // Solo branch Netlify `mostra` (VITE_MOSTRA=true): splash "PROVAMI" sui tablet.
+  const [showProvami, setShowProvami] = useState(() => {
+    if (!IS_MOSTRA) return false;
+    try {
+      return sessionStorage.getItem('dq_mostra_entered') !== '1';
+    } catch {
+      return true;
+    }
+  });
+
   return (
     <>
+      {showProvami && (
+        <ProvamiSplash onEnter={() => setShowProvami(false)} />
+      )}
       <ScrollToTop />
       <Suspense fallback={<BrutalistLoader />}>
         <Routes>
